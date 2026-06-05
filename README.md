@@ -129,14 +129,6 @@ These steps **cannot** be automated and are covered in [docs/SETUP.md](docs/SETU
 The defaults above are placeholders; change them in Settings (they persist per-browser) or
 edit the `defaults` object near the top of the `<script>` block in the HTML.
 
-## Note on `Scripts/patch_activity_views.py`
-
-The three workflows call this script **only** when the solution name contains `activities`
-or equals `hollandcloud_core` — an optional post-deploy fix that filters orphaned
-`activitypointer` typecodes out of system views. For any other solution the step is skipped,
-so it's harmless to keep. Delete the script and the `Patch Activity Views` steps (or change
-the `if:` gate) if you don't need it.
-
 ## Caveats worth knowing
 
 - **Rollback reads from `Solutions/Backups/`**, while Export/Deploy use `Solutions/Managed/`.
