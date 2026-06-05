@@ -147,5 +147,38 @@ the `if:` gate) if you don't need it.
   GitHub Environment doesn't exist still deploys, but **with no approval gate** — create it.
 - The dashboard auto-discovers solutions from Dataverse when embedded in the app (via
   `Xrm.WebApi`); in a plain browser it falls back to scanning `Solutions/Managed/` in the repo.
-</content>
-</invoke>
+
+---
+
+## 👋 Built by Kevin Holland
+
+I design and ship Power Platform / Dynamics 365 solutions backed by Azure data & AI. This
+dashboard is one of the ALM tools I build to make Dataverse deployments boring, repeatable,
+and auditable — single-file, no build step, fully driven from inside the app.
+
+## 🛠️ Tech Stack
+
+![Power Platform](https://img.shields.io/badge/Power_Platform-742774?style=for-the-badge)
+![Dynamics 365](https://img.shields.io/badge/Dynamics_365-002050?style=for-the-badge)
+![Microsoft Azure](https://img.shields.io/badge/Microsoft_Azure-0078D4?style=for-the-badge)
+![Microsoft Fabric](https://img.shields.io/badge/Microsoft_Fabric-117865?style=for-the-badge)
+![Power BI](https://img.shields.io/badge/Power_BI-F2C811?style=for-the-badge)
+![Azure AI](https://img.shields.io/badge/Azure_AI-0062AD?style=for-the-badge)
+![Microsoft 365](https://img.shields.io/badge/Microsoft_365-D83B01?style=for-the-badge)
+
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![.NET](https://img.shields.io/badge/.NET-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+
+## 📬 Let's connect
+
+- 🌐 [xpntl.dev](https://xpntl.dev)
+- 🏢 [CentrixIQ](https://centrixiq.com)
+<!-- Add your handles and uncomment:
+- 💼 [LinkedIn](https://www.linkedin.com/in/your-handle)
+- 🐦 [X / Twitter](https://x.com/your-handle)
+-->
+
+
