@@ -25,8 +25,8 @@ or a separate environment per client tenant — each with its own GitHub approva
 |---|---|
 | **Dashboard** — pick a solution, choose a destination, fire any pipeline; live run + approval status below. | **Solution picker** — auto-discovered from Dataverse (or scanned from the repo). |
 | ![Deployment dashboard](screenshots/dashboard.png) | ![Solution picker](screenshots/picker.png) |
-| **Deploy confirmation** — type the exact version to arm the button; the destination is shown in the dialog. | **Approval gate** — GitHub pauses the run on the destination's environment and emails reviewers. |
-| ![Deploy confirmation](screenshots/deploy-confirm.png) | ![Approval required](screenshots/approval.png) |
+| **Deploy confirmation** — type the exact version to arm the button; the destination is shown in the dialog. | **Approval gate** — every deploy pauses for GitHub approval; the dashboard surfaces the waiting run with a one-click Approve. |
+| ![Deploy confirmation](screenshots/deploy-confirm.png) | ![Awaiting approval](screenshots/approval.png) |
 
 ## Heads-up: this repo is a distribution template
 
