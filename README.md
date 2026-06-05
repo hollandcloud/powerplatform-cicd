@@ -11,7 +11,7 @@ or a separate environment per client tenant — each with its own GitHub approva
 ```
   Model-driven app (or browser)            GitHub                         Dataverse
  ┌───────────────────────────┐  dispatch ┌──────────────────┐  pac    ┌───────────────┐
- │ html_deploydashboard      │ ────────► │ export-and-...   │ ──────► │ Dev (source)  │
+ │ html_deploy-dashboard     │ ────────► │ export-and-...   │ ──────► │ Dev (source)  │
  │  • pick solution          │  (REST)   │ deploy-to-prod   │ ──────► │ Test          │
  │  • pick destination       │           │ rollback         │ ──────► │ Staging       │
  │  • Export / Deploy / Roll │ ◄──────── │ per-env approval │ ──────► │ Prod / Client │
