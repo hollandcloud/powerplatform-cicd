@@ -177,5 +177,6 @@ and auditable — single-file, no build step, fully driven from inside the app.
 - 🌐 [xpntl.dev](https://xpntl.dev)
 - 🏢 [CentrixIQ](https://centrixiq.com)
 - 💼 [LinkedIn](https://linkedin.com/in/holland-kevin)
+- 🐙 [GitHub](https://github.com/hollandcloud)
 
 
