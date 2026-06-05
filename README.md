@@ -152,8 +152,7 @@ the `if:` gate) if you don't need it.
 
 ## 👋 Built by Kevin Holland
 
-I design and ship Power Platform / Dynamics 365 solutions backed by Azure data & AI. This
-dashboard is one of the ALM tools I build to make Dataverse deployments boring, repeatable,
+This dashboard is one of the ALM tools I build to make Dataverse deployments boring, repeatable,
 and auditable — single-file, no build step, fully driven from inside the app.
 
 ## 🛠️ Tech Stack
