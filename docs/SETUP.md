@@ -135,8 +135,8 @@ secret** for each of the five.
 ## 6. Deploy the dashboard web resource
 
 1. In **make.powerapps.com**, open the solution you want it in → **New → More → Web
-   resource** (or edit an existing one). Type **HTML (1)**, name it `cx_html_deploydashboard`,
-   upload `webresource/cx_html_deploydashboard.html`.
+   resource** (or edit an existing one). Type **HTML (1)**, name it `html_deploy_dashboard`,
+   upload `webresource/html-deploy-dashboard.html`.
 2. **Save → Publish.**
 3. Surface it in your app — see [ADD-TO-MODEL-DRIVEN-APP.md](ADD-TO-MODEL-DRIVEN-APP.md).
 

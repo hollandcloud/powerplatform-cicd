@@ -1,6 +1,6 @@
 # Making the dashboard visible
 
-Prereq: `cx_html_deploydashboard` is uploaded as an HTML web resource and **published**
+Prereq: `html_deploy_dashboard` is uploaded as an HTML web resource and **published**
 (see [SETUP.md](SETUP.md) step 6).
 
 ---
@@ -10,7 +10,7 @@ Prereq: `cx_html_deploydashboard` is uploaded as an HTML web resource and **publ
 Best when you want a clean "Deployment Dashboard" entry separate from the business app:
 
 1. **+ New app → Model-driven**, name it **Deployment Dashboard**.
-2. **+ Add page → Web resource →** `cx_html_deploydashboard` → set as default page (as above).
+2. **+ Add page → Web resource →** `html_deploy_dashboard` → set as default page (as above).
 3. **Save → Publish → Share** with your admins/release managers only.
 
 They'll see **Deployment Dashboard** in their Power Apps app list and open it in one click.
@@ -24,7 +24,7 @@ it the **first** SubArea in the **first** Group/Area to have it load by default.
 
 ```xml
 <SubArea Id="sa_deploydashboard"
-         Url="$webresource:cx_html_deploydashboard"
+         Url="$webresource:html_deploy_dashboard"
          VectorIcon="/WebResources/cx_icon_deploy"
          Client="All,Web"
          AvailableOffline="false"
@@ -43,7 +43,7 @@ solution. (Drop `VectorIcon` or point it at an icon web resource you actually ha
 ## Option 4 — System dashboard wrapper
 
 Create a Dataverse **dashboard** with a single **web resource** component
-(`cx_html_deploydashboard`). Useful if you want it to appear under the app's *Dashboards* area rather than as a standalone page.
+(`html_deploy_dashboard`). Useful if you want it to appear under the app's *Dashboards* area rather than as a standalone page.
 
 ---
 

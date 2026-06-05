@@ -11,7 +11,7 @@ or a separate environment per client tenant — each with its own GitHub approva
 ```
   Model-driven app (or browser)            GitHub                         Dataverse
  ┌───────────────────────────┐  dispatch ┌──────────────────┐  pac    ┌───────────────┐
- │ html_deploy-dashboard     │ ────────► │ export-and-...   │ ──────► │ Dev (source)  │
+ │ html_deploy_dashboard     │ ────────► │ export-and-...   │ ──────► │ Dev (source)  │
  │  • pick solution          │  (REST)   │ deploy-to-prod   │ ──────► │ Test          │
  │  • pick destination       │           │ rollback         │ ──────► │ Staging       │
  │  • Export / Deploy / Roll │ ◄──────── │ per-env approval │ ──────► │ Prod / Client │
@@ -40,7 +40,7 @@ the dashboard triggers them by filename). See **[docs/SETUP.md](docs/SETUP.md)**
 ```
 .
 ├── webresource/
-│   └── cx_html_deploydashboard.html   The dashboard (one file, no build step)
+│   └── html-deploy-dashboard.html     The dashboard (one file, no build step)
 ├── examples/workflows/                 EXAMPLE pipelines — copy into .github/workflows/
 │   ├── export-and-validate.yml         Export from source → solution checker → commit ZIPs
 │   ├── deploy-to-prod.yml              Import managed ZIP to a destination (approval-gated) → release
@@ -94,7 +94,7 @@ Full walkthrough: **[docs/MULTIPLE-ENVIRONMENTS.md](docs/MULTIPLE-ENVIRONMENTS.m
 2. Follow **[docs/SETUP.md](docs/SETUP.md)** — register a service principal, add it as an
    application user in your source **and** each destination, set the repo secrets, and create
    a GitHub Environment per destination (the approval gates).
-3. Upload `webresource/cx_html_deploydashboard.html` as a web resource in your Dataverse
+3. Upload `webresource/html-deploy-dashboard.html` as a web resource in your Dataverse
    solution and **Publish**.
 4. Open the dashboard, click **Settings**, and fill in: GitHub PAT, repo (`owner/repo`),
    the source environment, and one or more destinations. Click **Sync Secrets to GitHub** to
