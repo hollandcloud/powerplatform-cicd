@@ -1,0 +1,245 @@
+# =============================================================================
+# EXAMPLE WORKFLOW — NOT ACTIVE IN THIS REPOSITORY
+# -----------------------------------------------------------------------------
+# This repository is distributed as a template, so the workflows live under
+# `examples/workflows/` where GitHub does NOT register or run them.
+#
+# To use it: copy this file into `.github/workflows/` in YOUR deployment repo,
+# then follow docs/SETUP.md. Keep the filename (export-and-validate.yml)
+# unchanged — the dashboard triggers the workflow by filename.
+#
+# This is the SOURCE side of the pipeline: it exports from one environment
+# (your Dev source). The export source is set per-run via `environment_url`.
+# Multiple DEPLOY destinations are configured in deploy-to-prod.yml — see
+# docs/MULTIPLE-ENVIRONMENTS.md.
+# =============================================================================
+name: Export & Validate Solution
+run-name: "Export [${{ inputs.solution_name }}]"
+
+on:
+  workflow_dispatch:
+    inputs:
+      solution_name:
+        description: 'Solution name to export'
+        required: true
+        default: 'primarysolution'
+        type: string
+      environment_url:
+        description: 'Dataverse environment URL of the export source (overrides DEV_ENV_URL secret)'
+        required: false
+        type: string
+      pac_auth_index:
+        description: 'PAC auth profile index to select (optional)'
+        required: false
+        type: string
+
+concurrency:
+  group: export-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  export:
+    name: Export from Dev & Validate
+    runs-on: windows-latest
+    outputs:
+      solution_version: ${{ steps.bump_version.outputs.SOLUTION_VERSION }}
+      solution_version_underscored: ${{ steps.bump_version.outputs.SOLUTION_VERSION_UNDERSCORED }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install PAC CLI
+        run: dotnet tool install --global Microsoft.PowerApps.CLI.Tool
+
+      - name: Authenticate to Dev
+        env:
+          ENV_URL: ${{ inputs.environment_url || secrets.DEV_ENV_URL }}
+          PAC_AUTH_INDEX: ${{ inputs.pac_auth_index }}
+          PP_APP_ID: ${{ secrets.PP_CLIENT_ID }}
+          PP_SECRET: ${{ secrets.PP_CLIENT_SECRET }}
+          PP_TENANT: ${{ secrets.PP_TENANT_ID }}
+        run: |
+          if (-not $env:PP_TENANT) {
+            Write-Error "PP_TENANT_ID secret is not configured in this repository"
+            exit 1
+          }
+          pac auth create --name DevEnv `
+            --applicationId $env:PP_APP_ID `
+            --clientSecret $env:PP_SECRET `
+            --tenant $env:PP_TENANT `
+            --environment $env:ENV_URL
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($env:PAC_AUTH_INDEX) {
+            pac auth select --index $env:PAC_AUTH_INDEX
+          }
+        shell: pwsh
+
+      # --- Generate date-based version label ---
+      - name: Generate Version Label
+        id: bump_version
+        run: |
+          $today = Get-Date -Format "yyyy.MM.dd"
+          $todayUnderscore = $today -replace '\.', '_'
+
+          # Determine build number by checking existing ZIPs in repo (zero-padded, starts at 01)
+          $existingZips = Get-ChildItem -Path ./Solutions/Managed -Filter "${{ inputs.solution_name }}_${todayUnderscore}_*_managed.zip" -ErrorAction SilentlyContinue
+          if ($existingZips) {
+            $maxBuild = $existingZips | ForEach-Object {
+              if ($_.Name -match "_${todayUnderscore}_(\d+)_managed\.zip$") { [int]$Matches[1] } else { 0 }
+            } | Measure-Object -Maximum | Select-Object -ExpandProperty Maximum
+            $build = $maxBuild + 1
+          } else {
+            $build = 1
+          }
+
+          $buildPadded = ([int]$build).ToString("D2")
+          $version = "$today.$buildPadded"
+          $versionUnderscore = "${todayUnderscore}_$buildPadded"
+          Write-Host "Version: $version"
+
+          echo "SOLUTION_VERSION=$version" >> $env:GITHUB_OUTPUT
+          echo "SOLUTION_VERSION_UNDERSCORED=$versionUnderscore" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
+      # --- Export Unmanaged ---
+      # --- Re-apply activity view filter in source before export (OPTIONAL) ---
+      # Defensive: ensures the orphan-filter customizations on activity views
+      # are present in the source env so they travel with the exported solution.
+      # Runs only for solutions whose name contains 'activities' or equals
+      # 'hollandcloud_core' — adjust/remove this gate for your own solutions.
+      - name: Patch Activity Views in Dev (pre-export)
+        if: contains(inputs.solution_name, 'activities') || inputs.solution_name == 'hollandcloud_core'
+        env:
+          ENV_URL: ${{ inputs.environment_url || secrets.DEV_ENV_URL }}
+          PP_APP_ID: ${{ secrets.PP_CLIENT_ID }}
+          PP_SECRET: ${{ secrets.PP_CLIENT_SECRET }}
+          PP_TENANT: ${{ secrets.PP_TENANT_ID }}
+        run: |
+          az login --service-principal --username $env:PP_APP_ID --password $env:PP_SECRET --tenant $env:PP_TENANT --allow-no-subscriptions | Out-Null
+          $token = az account get-access-token --resource $env:ENV_URL --query accessToken -o tsv
+          $env:DATAVERSE_TOKEN = $token
+          python Scripts/patch_activity_views.py --env-url $env:ENV_URL
+        shell: pwsh
+
+      - name: Export Unmanaged Solution
+        run: |
+          pac solution export `
+            --name ${{ inputs.solution_name }} `
+            --path ./Solutions/Unmanaged/${{ inputs.solution_name }}_${{ steps.bump_version.outputs.SOLUTION_VERSION_UNDERSCORED }}.zip `
+            --async `
+            --max-async-wait-time 300
+        shell: pwsh
+
+      # --- Export Managed ---
+      - name: Export Managed Solution
+        run: |
+          pac solution export `
+            --name ${{ inputs.solution_name }} `
+            --path ./Solutions/Managed/${{ inputs.solution_name }}_${{ steps.bump_version.outputs.SOLUTION_VERSION_UNDERSCORED }}_managed.zip `
+            --managed `
+            --async `
+            --max-async-wait-time 300
+        shell: pwsh
+
+      # --- Unpack for source diffing ---
+      - name: Unpack Solution Source
+        run: |
+          pac solution unpack `
+            --zipfile ./Solutions/Unmanaged/${{ inputs.solution_name }}_${{ steps.bump_version.outputs.SOLUTION_VERSION_UNDERSCORED }}.zip `
+            --folder ./Solutions/Source/${{ inputs.solution_name }}
+        shell: pwsh
+
+      # --- Solution Checker ---
+      - name: Run Solution Checker
+        id: solution_check
+        run: |
+          pac solution check `
+            --path ./Solutions/Unmanaged/${{ inputs.solution_name }}_${{ steps.bump_version.outputs.SOLUTION_VERSION_UNDERSCORED }}.zip `
+            --outputDirectory ./SolutionCheckResults `
+            --geo UnitedStates 2>&1 | Tee-Object -Variable checkOutput
+
+          # Save raw output for the report script
+          $checkOutput | Out-File -FilePath ./SolutionCheckResults/raw_output.txt
+
+          echo "CHECK_EXIT_CODE=$LASTEXITCODE" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+        continue-on-error: true
+
+      # --- Parse & Report ---
+      - name: Parse Solution Checker Results
+        id: parse_results
+        run: |
+          $scriptPath = "${{ github.workspace }}/CICD/scripts/Parse-SolutionCheckerResults.ps1"
+          if (Test-Path $scriptPath) {
+            & $scriptPath -ResultsDirectory ./SolutionCheckResults -OutputFile $env:GITHUB_STEP_SUMMARY
+          } else {
+            Write-Host "::warning::Parse script not found, using inline summary"
+
+            $summary = @"
+          ## Solution Export Summary
+
+          | Field | Value |
+          |-------|-------|
+          | **Solution** | ${{ inputs.solution_name }} |
+          | **Version** | ${{ steps.bump_version.outputs.SOLUTION_VERSION }} |
+          | **Export Date** | $(Get-Date -Format 'yyyy-MM-dd HH:mm UTC') |
+          | **Solution Checker** | Exit code: ${{ steps.solution_check.outputs.CHECK_EXIT_CODE }} |
+
+          ### Artifacts
+          - Managed ZIP: ``Solutions/Managed/${{ inputs.solution_name }}_${{ steps.bump_version.outputs.SOLUTION_VERSION_UNDERSCORED }}_managed.zip``
+          - Unmanaged ZIP: ``Solutions/Unmanaged/${{ inputs.solution_name }}_${{ steps.bump_version.outputs.SOLUTION_VERSION_UNDERSCORED }}.zip``
+          - Unpacked source: ``Solutions/Source/${{ inputs.solution_name }}/``
+          "@
+
+            $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          }
+        shell: pwsh
+
+      # --- Fail on Critical ---
+      - name: Fail on Critical Issues
+        if: steps.solution_check.outputs.CHECK_EXIT_CODE == '1'
+        run: |
+          Write-Host "::error::Solution checker found critical issues. Review the results above."
+          exit 1
+        shell: pwsh
+
+      # --- Upload checker results ---
+      - name: Upload Solution Checker Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: solution-checker-results
+          path: ./SolutionCheckResults/
+          retention-days: 30
+          if-no-files-found: ignore
+
+      # --- Upload solution ZIPs ---
+      - name: Upload Solution Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: solution-zips-${{ steps.bump_version.outputs.SOLUTION_VERSION_UNDERSCORED }}
+          path: |
+            ./Solutions/Managed/${{ inputs.solution_name }}_${{ steps.bump_version.outputs.SOLUTION_VERSION_UNDERSCORED }}_managed.zip
+            ./Solutions/Unmanaged/${{ inputs.solution_name }}_${{ steps.bump_version.outputs.SOLUTION_VERSION_UNDERSCORED }}.zip
+          retention-days: 30
+
+      # --- Commit to repo ---
+      - name: Commit Solutions to Repo
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+          git add Solutions/Managed/${{ inputs.solution_name }}_${{ steps.bump_version.outputs.SOLUTION_VERSION_UNDERSCORED }}_managed.zip
+          git add Solutions/Unmanaged/${{ inputs.solution_name }}_${{ steps.bump_version.outputs.SOLUTION_VERSION_UNDERSCORED }}.zip
+          git add Solutions/Source/${{ inputs.solution_name }}/ --force
+
+          git commit -m "chore: export ${{ inputs.solution_name }} v${{ steps.bump_version.outputs.SOLUTION_VERSION }} from Dev [skip ci]" || echo "No changes to commit"
+          git pull --rebase origin main
+          git push origin main
+        shell: pwsh

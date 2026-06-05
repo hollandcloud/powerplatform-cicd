@@ -1,0 +1,27 @@
+# Secrets / tokens — never commit
+*.token
+token.txt
+.env
+.env.*
+
+# PAC / dotnet
+.pac/
+bin/
+obj/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Solution checker scratch (results are uploaded as workflow artifacts)
+SolutionCheckResults/*
+!SolutionCheckResults/.gitkeep
+
+/.remember
+# Playwright MCP scratch
+.playwright-mcp/

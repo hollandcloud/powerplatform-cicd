@@ -1,0 +1,1956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deployment Dashboard</title>
+    <style>
+        :root {
+            --primary: #0078d4;
+            --primary-dark: #106ebe;
+            --success: #107c10;
+            --warning: #ff8c00;
+            --danger: #d13438;
+            --neutral-bg: #f3f2f1;
+            --neutral-border: #edebe9;
+            --text-primary: #323130;
+            --text-secondary: #605e5c;
+            --white: #ffffff;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--neutral-bg);
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .dashboard {
+            max-width: none;
+            margin: 0 auto;
+            padding: 20px 32px;
+        }
+
+        /* --- Header --- */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .header .subtitle {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* --- Config Banner --- */
+        .config-banner {
+            background: var(--warning);
+            color: var(--white);
+            padding: 12px 20px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .config-banner.show { display: block; }
+
+        /* --- Cards --- */
+        .card {
+            background: var(--white);
+            border: 1px solid var(--neutral-border);
+            border-radius: 4px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .card h2 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* --- Action Buttons --- */
+        .actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .action-card {
+            background: var(--white);
+            border: 1px solid var(--neutral-border);
+            border-radius: 4px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .action-card h3 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .action-card p {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+
+        .action-card .card-spacer {
+            flex: 1;
+        }
+
+        /* --- Modal --- */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.show { display: flex; }
+
+        .modal {
+            background: var(--white);
+            border-radius: 8px;
+            padding: 28px;
+            max-width: 480px;
+            width: 90%;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        }
+
+        .modal h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--danger);
+        }
+
+        .modal p {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+
+        .modal input[type="text"] {
+            margin-bottom: 8px;
+        }
+
+        .modal .confirm-hint {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+
+        .modal .modal-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .action-card > .btn {
+            width: 100%;
+            text-align: center;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: var(--white);
+        }
+
+        .btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+
+        .btn-danger {
+            background: var(--danger);
+            color: var(--white);
+        }
+
+        .btn-danger:hover:not(:disabled) { background: #a4262c; }
+
+        .btn-outline {
+            background: var(--white);
+            color: var(--primary);
+            border: 1px solid var(--primary);
+        }
+
+        .btn-outline:hover:not(:disabled) { background: #f0f6ff; }
+
+        .btn-sm {
+            padding: 4px 12px;
+            font-size: 12px;
+        }
+
+        /* --- Select inputs --- */
+        select, input[type="text"] {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--neutral-border);
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+            margin-bottom: 12px;
+            background: var(--white);
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: var(--text-secondary);
+        }
+
+        /* --- Workflow Runs Table --- */
+        .runs-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .runs-table th {
+            text-align: left;
+            padding: 10px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid var(--neutral-border);
+        }
+
+        .runs-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--neutral-border);
+            font-size: 13px;
+        }
+
+        .runs-table tr:hover { background: #faf9f8; }
+
+        /* --- Status Badges --- */
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-success { background: #dff6dd; color: var(--success); }
+        .status-success .status-dot { background: var(--success); }
+
+        .status-failure { background: #fde7e9; color: var(--danger); }
+        .status-failure .status-dot { background: var(--danger); }
+
+        .status-in_progress { background: #fff4ce; color: var(--warning); }
+        .status-in_progress .status-dot { background: var(--warning); animation: pulse 1.5s infinite; }
+
+        .status-queued { background: #e8e8e8; color: var(--text-secondary); }
+        .status-queued .status-dot { background: var(--text-secondary); }
+
+        .status-waiting { background: #e0d4f7; color: #5c2d91; }
+        .status-waiting .status-dot { background: #5c2d91; animation: pulse 1.5s infinite; }
+
+        .status-action_required { background: #e0d4f7; color: #5c2d91; }
+        .status-action_required .status-dot { background: #5c2d91; animation: pulse 1.5s infinite; }
+
+        .status-pending { background: #e8e8e8; color: var(--text-secondary); }
+        .status-pending .status-dot { background: var(--text-secondary); }
+
+        .status-approved { background: #e9d8fd; color: #6b21a8; }
+        .status-approved .status-dot { background: #6b21a8; }
+
+        .status-rejected { background: #fde7e9; color: var(--danger); }
+        .status-rejected .status-dot { background: var(--danger); }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* --- Settings Panel --- */
+        .settings-panel {
+            display: none;
+            background: var(--white);
+            border: 1px solid var(--neutral-border);
+            border-radius: 4px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+
+        .settings-panel.show { display: block; }
+
+        .settings-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 12px;
+        }
+
+        /* --- Loading --- */
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--neutral-border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .loading-overlay {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        /* --- Toast --- */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 4px;
+            color: var(--white);
+            font-weight: 600;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.3s, transform 0.3s;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .toast-success { background: var(--success); }
+        .toast-error { background: var(--danger); }
+
+        /* --- Refresh --- */
+        .refresh-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* --- Solution Picker Bar --- */
+        .solution-bar {
+            background: var(--white);
+            border: 1px solid var(--neutral-border);
+            border-radius: 4px;
+            padding: 12px 20px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .solution-bar label {
+            margin: 0;
+            white-space: nowrap;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .solution-bar select {
+            margin: 0;
+            flex: 1;
+            max-width: 480px;
+        }
+
+        .solution-bar .solution-meta {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-left: auto;
+        }
+
+        .solution-bar .solution-meta strong {
+            color: var(--text-primary);
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/libsodium-sumo@0.7.15/dist/modules-sumo/libsodium-sumo.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/libsodium-wrappers-sumo@0.7.15/dist/modules-sumo/libsodium-wrappers.js"></script>
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Header -->
+        <div class="header">
+            <div>
+                <h1>Deployment Dashboard</h1>
+                <div class="subtitle">GitHub &middot; CI/CD Pipeline Control</div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn btn-outline btn-sm" onclick="toggleSettings()">Settings</button>
+                <button class="btn btn-outline btn-sm" onclick="refreshAll()">
+                    Refresh
+                </button>
+            </div>
+        </div>
+
+        <!-- Config Banner -->
+        <div class="config-banner" id="configBanner">
+            GitHub PAT not configured. Click <strong>Settings</strong> to add your token.
+        </div>
+
+        <!-- Solution Picker -->
+        <div class="solution-bar">
+            <label for="solutionPicker">Solution:</label>
+            <select id="solutionPicker" onchange="onSolutionChange()">
+                <option value="">Loading solutions...</option>
+            </select>
+            <div class="solution-meta" id="solutionMeta"></div>
+        </div>
+
+        <!-- Settings Panel -->
+        <div class="settings-panel" id="settingsPanel">
+            <h2>Configuration</h2>
+
+            <div class="settings-row">
+                <div>
+                    <label>GitHub Personal Access Token</label>
+                    <input type="text" id="ghToken" placeholder="ghp_xxxxxxxxxxxx"
+                           onchange="saveSettings()" />
+                    <div style="font-size:11px; color:var(--text-secondary);">
+                        Needs <code>repo</code> and <code>workflow</code> scopes.
+                        Stored in browser localStorage only.
+                    </div>
+                </div>
+                <div>
+                    <label>Repository (owner/repo)</label>
+                    <input type="text" id="ghRepo" placeholder="hollandcloud/primarysolution"
+                           value="hollandcloud/primarysolution" onchange="saveSettings()" />
+                </div>
+            </div>
+            <div class="settings-row">
+                <div>
+                    <label>Auto-refresh interval (seconds)</label>
+                    <input type="text" id="refreshInterval" placeholder="30"
+                           value="30" onchange="saveSettings()" />
+                </div>
+                <div>
+                    <label>Default solution (used when picker can't load)</label>
+                    <input type="text" id="defaultSolution" placeholder="hollandcloud/primarysolution"
+                           value="hollandcloud/primarysolution" onchange="saveSettings()" />
+                </div>
+            </div>
+
+            <h3 style="margin:16px 0 8px; font-size:14px; font-weight:600; border-top:1px solid var(--neutral-border); padding-top:16px;">
+                Export Source
+            </h3>
+            <div style="font-size:11px; color:var(--text-secondary); margin-bottom:8px;">
+                The environment <strong>Export &amp; Validate</strong> pulls solutions <em>from</em> (your Dev).
+            </div>
+            <div class="settings-row">
+                <div>
+                    <label>Environment URL</label>
+                    <input type="text" id="sourceEnvUrl" placeholder="https://org.crm.dynamics.com"
+                           onchange="saveSettings()" />
+                </div>
+                <div>
+                    <label>Display Name</label>
+                    <input type="text" id="sourceEnvName" placeholder="hollandcloud-dev"
+                           onchange="saveSettings()" />
+                </div>
+                <div>
+                    <label>PAC Auth Index</label>
+                    <input type="text" id="sourcePacIndex" placeholder="8" style="width:60px;"
+                           onchange="saveSettings()" />
+                </div>
+            </div>
+
+            <h3 style="margin:16px 0 8px; font-size:14px; font-weight:600; border-top:1px solid var(--neutral-border); padding-top:16px; display:flex; align-items:center; justify-content:space-between;">
+                <span>Deploy Destinations</span>
+                <button class="btn btn-outline btn-sm" type="button" onclick="addDestination()">+ Add destination</button>
+            </h3>
+            <div style="font-size:11px; color:var(--text-secondary); margin-bottom:12px;">
+                Each destination is one Dataverse target you can deploy/roll back to. The
+                <strong>GitHub Environment</strong> is the approval gate for that destination — create a
+                matching environment in repo Settings to require reviewers. Same-tenant destinations need
+                no extra secrets; different tenants do — see
+                <code>docs/MULTIPLE-ENVIRONMENTS.md</code>.
+            </div>
+            <div id="destinationsList"></div>
+
+            <h3 style="margin:16px 0 8px; font-size:14px; font-weight:600; border-top:1px solid var(--neutral-border); padding-top:16px;">
+                CI/CD Secrets (Service Principal)
+            </h3>
+            <div style="font-size:11px; color:var(--text-secondary); margin-bottom:8px;">
+                These values are encrypted and pushed to GitHub repo secrets when you click
+                <strong>Sync Secrets</strong>. They are <em>not</em> stored in your browser.
+            </div>
+            <div class="settings-row">
+                <div>
+                    <label>Application (Client) ID</label>
+                    <input type="text" id="ppClientId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+                </div>
+                <div>
+                    <label>Client Secret</label>
+                    <input type="password" id="ppClientSecret" placeholder="client secret value" />
+                </div>
+                <div>
+                    <label>Tenant ID</label>
+                    <input type="text" id="ppTenantId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+                </div>
+            </div>
+            <div id="secretSyncStatus" style="font-size:12px; margin:8px 0; min-height:18px;"></div>
+            <div style="display:flex; gap:8px; margin-top:4px;">
+                <button class="btn btn-primary btn-sm" onclick="syncSecretsToGitHub()">
+                    Sync Secrets to GitHub
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="checkSecretsStatus()">
+                    Check Status
+                </button>
+            </div>
+
+            <div style="margin-top:16px; border-top:1px solid var(--neutral-border); padding-top:16px;">
+                <button class="btn btn-primary btn-sm" onclick="saveSettings(); toggleSettings();">
+                    Save &amp; Close
+                </button>
+            </div>
+        </div>
+
+        <!-- Action Cards -->
+        <div class="actions">
+            <!-- Export -->
+            <div class="action-card">
+                <h3>Export from <span data-env-dev>Dev</span></h3>
+                <p>Export solution from <span data-env-dev>Dev</span> environment, run solution checker,
+                   and commit managed + unmanaged ZIPs to the repo.</p>
+                <div class="card-spacer"></div>
+                <button class="btn btn-primary" id="btnExport" onclick="showExportModal()">
+                    Export &amp; Validate
+                </button>
+            </div>
+
+            <!-- Deploy -->
+            <div class="action-card">
+                <h3>Deploy to <span data-env-prod>Production</span></h3>
+                <p>Deploy a specific managed solution version to a destination.
+                   Requires approval in GitHub.</p>
+                <div class="card-spacer"></div>
+                <label>Destination</label>
+                <select id="deployDestination" onchange="onDeployDestinationChange()">
+                    <option value="">Loading destinations...</option>
+                </select>
+                <label>Version to deploy</label>
+                <select id="deployVersion">
+                    <option value="">Loading versions...</option>
+                </select>
+                <button class="btn btn-primary" id="btnDeploy" onclick="showDeployModal()">
+                    Deploy to <span data-env-prod>Prod</span>
+                </button>
+            </div>
+
+            <!-- Rollback -->
+            <div class="action-card">
+                <h3>Emergency Rollback</h3>
+                <p>Restore <span data-env-rollback>Production</span> to a previous managed solution version.
+                   Requires approval in GitHub.</p>
+                <div class="card-spacer"></div>
+                <label>Destination</label>
+                <select id="rollbackDestination" onchange="onRollbackDestinationChange()">
+                    <option value="">Loading destinations...</option>
+                </select>
+                <label>Version to restore</label>
+                <select id="rollbackVersion">
+                    <option value="">Loading versions...</option>
+                </select>
+                <button class="btn btn-danger" id="btnRollback" onclick="showRollbackModal()">
+                    Rollback <span data-env-rollback>Prod</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Export Confirmation Modal -->
+        <div class="modal-overlay" id="exportModal">
+            <div class="modal">
+                <h3 style="color:var(--primary);">Confirm Export &amp; Validate</h3>
+                <p>This will export <strong id="exportSolutionName"></strong> from <strong><span data-env-dev>Dev</span></strong>, run solution checker,
+                   and commit the managed + unmanaged ZIPs to the repo.</p>
+                <p>To confirm, type <strong>EXPORT</strong> below:</p>
+                <div style="background:#e8f4fd; padding:8px 12px; border-radius:4px; margin-bottom:12px; font-weight:600; font-size:13px; color:var(--primary);">EXPORT</div>
+                <input type="text" id="exportConfirmInput" placeholder="Type EXPORT to confirm..." autocomplete="off" />
+                <div class="confirm-hint">Must match exactly to proceed.</div>
+                <div class="modal-actions">
+                    <button class="btn btn-outline" onclick="hideExportModal()">Cancel</button>
+                    <button class="btn btn-primary" id="btnExportConfirm" onclick="triggerExport()" disabled>
+                        Export &amp; Validate
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Deploy Confirmation Modal -->
+        <div class="modal-overlay" id="deployModal">
+            <div class="modal">
+                <h3 style="color:var(--primary);">Confirm Deploy</h3>
+                <p>You are about to deploy <strong id="deploySolutionName"></strong> to <strong><span data-env-prod>Production</span></strong>.
+                   This requires GitHub approval before the import begins.</p>
+                <p>To confirm, type the version you are deploying below:</p>
+                <div style="background:#e8f4fd; padding:8px 12px; border-radius:4px; margin-bottom:12px; font-weight:600; font-size:13px; color:var(--primary);"
+                     id="deployTarget"></div>
+                <input type="text" id="deployConfirmInput" placeholder="Type the version to confirm..." autocomplete="off" />
+                <div class="confirm-hint">Must match exactly to proceed.</div>
+                <div class="modal-actions">
+                    <button class="btn btn-outline" onclick="hideDeployModal()">Cancel</button>
+                    <button class="btn btn-primary" id="btnDeployConfirm" onclick="triggerDeploy()" disabled>
+                        Deploy to <span data-env-prod>Production</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rollback Confirmation Modal -->
+        <div class="modal-overlay" id="rollbackModal">
+            <div class="modal">
+                <h3>Confirm <span data-env-rollback>Production</span> Rollback</h3>
+                <p>You are about to <strong>rollback <span data-env-rollback>Production</span></strong> for <strong id="rollbackSolutionName"></strong> to a previous version.
+                   This will overwrite the current deployed solution and requires GitHub approval.</p>
+                <p>To confirm, type the version you are restoring below:</p>
+                <div style="background:#fde7e9; padding:8px 12px; border-radius:4px; margin-bottom:12px; font-weight:600; font-size:13px; color:var(--danger);"
+                     id="rollbackTarget"></div>
+                <input type="text" id="rollbackConfirmInput" placeholder="Type the version to confirm..." autocomplete="off" />
+                <div class="confirm-hint">Must match exactly to proceed.</div>
+                <div class="modal-actions">
+                    <button class="btn btn-outline" onclick="hideRollbackModal()">Cancel</button>
+                    <button class="btn btn-danger" id="btnRollbackConfirm" onclick="confirmRollbackStep2()" disabled>
+                        Rollback <span data-env-rollback>Production</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Runs -->
+        <div class="card">
+            <div class="refresh-bar">
+                <h2>Recent Pipeline Runs</h2>
+                <div class="auto-refresh">
+                    <input type="checkbox" id="autoRefresh" checked onchange="toggleAutoRefresh()" />
+                    <label for="autoRefresh" style="margin:0; font-weight:normal;">Auto-refresh</label>
+                    <span id="countdown"></span>
+                </div>
+            </div>
+            <div id="runsContainer">
+                <div class="loading-overlay">
+                    <div class="spinner"></div>
+                    <span>Loading runs...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Releases -->
+        <div class="card">
+            <h2>Recent Releases</h2>
+            <div id="releasesContainer">
+                <div class="loading-overlay">
+                    <div class="spinner"></div>
+                    <span>Loading releases...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // =====================================================================
+        // Configuration
+        // =====================================================================
+        const CONFIG_KEY = "cx_deploy_dashboard_config";
+
+        // Available solutions discovered from Dataverse (or fallback)
+        let availableSolutions = [];
+        window.availableSolutions = availableSolutions;
+
+        function getConfig() {
+            const defaults = {
+                ghToken: "",
+                ghRepo: "hollandcloud/primarysolution",
+                defaultSolution: "hollandcloud/primarysolution",
+                lastSolution: "",
+                refreshInterval: 30,
+                // Export pulls FROM this single source environment
+                source: {
+                    url: "https://hollandcloud-dev.crm.dynamics.com",
+                    name: "hollandcloud-dev",
+                    pacIndex: "8"
+                },
+                // Deploy / rollback target one of these destinations.
+                // Each maps to a GitHub Environment (the approval gate).
+                destinations: [
+                    {
+                        id: "production",
+                        name: "hollandcloud-prod",
+                        url: "https://hollandcloud-prod.crm.dynamics.com",
+                        pacIndex: "",
+                        githubEnv: "production"
+                    }
+                ],
+                lastDeployDest: "production",
+                lastRollbackDest: "production"
+            };
+
+            let stored = {};
+            try { stored = JSON.parse(localStorage.getItem(CONFIG_KEY) || "{}"); } catch {}
+
+            const cfg = { ...defaults, ...stored };
+
+            // --- Migrate legacy flat dev/prod fields into source + destinations ---
+            if (!stored.source && (stored.devEnvUrl || stored.devEnvName || stored.devPacIndex)) {
+                cfg.source = {
+                    url: (stored.devEnvUrl || "").replace(/\/+$/, ""),
+                    name: stored.devEnvName || "",
+                    pacIndex: stored.devPacIndex || ""
+                };
+            }
+            if (!stored.destinations && (stored.prodEnvUrl || stored.prodEnvName || stored.prodPacIndex)) {
+                cfg.destinations = [{
+                    id: "production",
+                    name: stored.prodEnvName || "Production",
+                    url: (stored.prodEnvUrl || "").replace(/\/+$/, ""),
+                    pacIndex: stored.prodPacIndex || "",
+                    githubEnv: "production"
+                }];
+            }
+
+            // --- Normalize shape so the rest of the code can trust it ---
+            if (!cfg.source || typeof cfg.source !== "object") cfg.source = { ...defaults.source };
+            if (!Array.isArray(cfg.destinations) || cfg.destinations.length === 0) {
+                cfg.destinations = defaults.destinations.map(d => ({ ...d }));
+            }
+            cfg.destinations = cfg.destinations.map((d, i) => ({
+                id: d.id || ("dest_" + i),
+                name: d.name || "",
+                url: (d.url || "").replace(/\/+$/, ""),
+                pacIndex: d.pacIndex || "",
+                githubEnv: d.githubEnv || ""
+            }));
+
+            return cfg;
+        }
+
+        // Merge a patch into stored config, dropping legacy flat keys.
+        function writeConfig(patch) {
+            const cfg = { ...getConfig(), ...patch };
+            ["devEnvUrl", "devEnvName", "devPacIndex",
+             "prodEnvUrl", "prodEnvName", "prodPacIndex"].forEach(k => delete cfg[k]);
+            localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+            return cfg;
+        }
+
+        // --- Destination helpers ---
+        function getDestinationById(id) {
+            return getConfig().destinations.find(d => d.id === id) || null;
+        }
+        function getSelectedDeployDestination() {
+            const cfg = getConfig();
+            const sel = document.getElementById("deployDestination");
+            const id = (sel && sel.value) || cfg.lastDeployDest || cfg.destinations[0].id;
+            return getDestinationById(id) || cfg.destinations[0];
+        }
+        function getSelectedRollbackDestination() {
+            const cfg = getConfig();
+            const sel = document.getElementById("rollbackDestination");
+            const id = (sel && sel.value) || cfg.lastRollbackDest || cfg.destinations[0].id;
+            return getDestinationById(id) || cfg.destinations[0];
+        }
+
+        function extractSolutionFromRun(run) {
+            // Pull solution unique name from run.display_title (set by workflow run-name).
+            // Newer display_title pattern (brackets):  "Deploy [hollandcloud/primarysolution] v1.0.0.0"
+            // Legacy pattern (no brackets):           "Deploy hollandcloud/primarysolution v1.0.0.0"
+            const title = run.display_title || run.name || "";
+            // 1) bracketed form
+            let m = title.match(/\[([A-Za-z0-9_]+)\]/);
+            if (m) return m[1];
+            // 2) legacy unbracketed — match Deploy|Export|Rollback then a token,
+            //    filtering out positional stopwords that crop up when solution_name is empty
+            m = title.match(/^(?:Deploy|Export|Rollback)\s+([A-Za-z0-9_]+)/);
+            if (m && !/^(to|v|at|by|from)$/i.test(m[1])) return m[1];
+            // 3) Fallback: search title for any known solution unique name
+            if (window.availableSolutions) {
+                for (const s of window.availableSolutions) {
+                    if (s.uniqueName && title.includes(s.uniqueName)) return s.uniqueName;
+                }
+            }
+            return "";
+        }
+
+        function getCurrentSolution() {
+            return document.getElementById("solutionPicker").value || getConfig().defaultSolution;
+        }
+
+        function saveSettings() {
+            const current = getConfig();
+
+            const source = {
+                url: (document.getElementById("sourceEnvUrl").value || "").replace(/\/+$/, ""),
+                name: document.getElementById("sourceEnvName").value,
+                pacIndex: document.getElementById("sourcePacIndex").value
+            };
+
+            // Read destination rows straight from the DOM (data-driven list)
+            const destinations = [];
+            document.querySelectorAll("#destinationsList .dest-row").forEach(row => {
+                const get = f => {
+                    const el = row.querySelector(`[data-field="${f}"]`);
+                    return el ? el.value : "";
+                };
+                destinations.push({
+                    id: row.getAttribute("data-dest-id"),
+                    name: get("name"),
+                    url: get("url").replace(/\/+$/, ""),
+                    githubEnv: get("githubEnv"),
+                    pacIndex: get("pacIndex")
+                });
+            });
+            if (destinations.length === 0) destinations.push(...current.destinations);
+
+            writeConfig({
+                ghToken: document.getElementById("ghToken").value,
+                ghRepo: document.getElementById("ghRepo").value,
+                defaultSolution: document.getElementById("defaultSolution").value || "hollandcloud/primarysolution",
+                lastSolution: current.lastSolution,
+                refreshInterval: parseInt(document.getElementById("refreshInterval").value) || 30,
+                source,
+                destinations,
+                lastDeployDest: current.lastDeployDest,
+                lastRollbackDest: current.lastRollbackDest
+            });
+
+            updateConfigBanner();
+            populateDestinationPickers();
+            updateEnvLabels();
+            refreshAll();
+        }
+
+        function updateEnvLabels() {
+            const config = getConfig();
+            document.querySelectorAll("[data-env-dev]").forEach(el => {
+                el.textContent = config.source.name || "Dev";
+            });
+            const dep = getSelectedDeployDestination();
+            document.querySelectorAll("[data-env-prod]").forEach(el => {
+                el.textContent = (dep && dep.name) || "Production";
+            });
+            const rb = getSelectedRollbackDestination();
+            document.querySelectorAll("[data-env-rollback]").forEach(el => {
+                el.textContent = (rb && rb.name) || "Production";
+            });
+        }
+
+        // --- Render the editable destinations list in Settings ---
+        function renderDestinations() {
+            const cfg = getConfig();
+            const container = document.getElementById("destinationsList");
+            if (!container) return;
+            container.innerHTML = cfg.destinations.map(d => `
+                <div class="dest-row" data-dest-id="${escAttr(d.id)}"
+                     style="border:1px solid var(--neutral-border); border-radius:4px; padding:12px; margin-bottom:12px; background:#faf9f8;">
+                    <div class="settings-row">
+                        <div>
+                            <label>Display Name</label>
+                            <input type="text" data-field="name" value="${escAttr(d.name)}"
+                                   placeholder="Production" onchange="saveSettings()" />
+                        </div>
+                        <div>
+                            <label>Environment URL</label>
+                            <input type="text" data-field="url" value="${escAttr(d.url)}"
+                                   placeholder="https://org.crm.dynamics.com" onchange="saveSettings()" />
+                        </div>
+                    </div>
+                    <div class="settings-row">
+                        <div>
+                            <label>GitHub Environment (approval gate)</label>
+                            <input type="text" data-field="githubEnv" value="${escAttr(d.githubEnv)}"
+                                   placeholder="production" onchange="saveSettings()" />
+                        </div>
+                        <div>
+                            <label>PAC Auth Index</label>
+                            <input type="text" data-field="pacIndex" value="${escAttr(d.pacIndex)}"
+                                   placeholder="(optional)" onchange="saveSettings()" />
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        <button class="btn btn-outline btn-sm" type="button"
+                                onclick="removeDestination('${escAttr(d.id)}')">Remove destination</button>
+                    </div>
+                </div>
+            `).join("");
+        }
+
+        function addDestination() {
+            saveSettings();                       // persist anything currently typed
+            const cfg = getConfig();
+            cfg.destinations.push({
+                id: "dest_" + Date.now(),
+                name: "",
+                url: "",
+                githubEnv: "",
+                pacIndex: ""
+            });
+            writeConfig({ destinations: cfg.destinations });
+            renderDestinations();
+            populateDestinationPickers();
+        }
+
+        function removeDestination(id) {
+            saveSettings();                       // persist edits before mutating
+            const cfg = getConfig();
+            if (cfg.destinations.length <= 1) {
+                showToast("At least one destination is required", "error");
+                return;
+            }
+            const next = cfg.destinations.filter(d => d.id !== id);
+            const patch = { destinations: next };
+            if (cfg.lastDeployDest === id) patch.lastDeployDest = next[0].id;
+            if (cfg.lastRollbackDest === id) patch.lastRollbackDest = next[0].id;
+            writeConfig(patch);
+            renderDestinations();
+            populateDestinationPickers();
+            updateEnvLabels();
+        }
+
+        // --- Fill the Deploy/Rollback destination dropdowns ---
+        function populateDestinationPickers() {
+            const cfg = getConfig();
+            const opts = cfg.destinations.map(d =>
+                `<option value="${escAttr(d.id)}">${escHtml(d.name || d.githubEnv || d.url || d.id)}</option>`
+            ).join("");
+
+            const dep = document.getElementById("deployDestination");
+            if (dep) {
+                dep.innerHTML = opts;
+                if (cfg.destinations.some(d => d.id === cfg.lastDeployDest)) {
+                    dep.value = cfg.lastDeployDest;
+                }
+            }
+            const rb = document.getElementById("rollbackDestination");
+            if (rb) {
+                rb.innerHTML = opts;
+                if (cfg.destinations.some(d => d.id === cfg.lastRollbackDest)) {
+                    rb.value = cfg.lastRollbackDest;
+                }
+            }
+        }
+
+        function onDeployDestinationChange() {
+            const sel = document.getElementById("deployDestination");
+            writeConfig({ lastDeployDest: sel.value });
+            updateEnvLabels();
+        }
+
+        function onRollbackDestinationChange() {
+            const sel = document.getElementById("rollbackDestination");
+            writeConfig({ lastRollbackDest: sel.value });
+            updateEnvLabels();
+        }
+
+        function persistSelectedSolution(uniqueName) {
+            const config = getConfig();
+            config.lastSolution = uniqueName;
+            localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+        }
+
+        function loadSettings() {
+            const config = getConfig();
+            document.getElementById("ghToken").value = config.ghToken;
+            document.getElementById("ghRepo").value = config.ghRepo;
+            document.getElementById("defaultSolution").value = config.defaultSolution;
+            document.getElementById("refreshInterval").value = config.refreshInterval;
+            document.getElementById("sourceEnvUrl").value = config.source.url;
+            document.getElementById("sourceEnvName").value = config.source.name;
+            document.getElementById("sourcePacIndex").value = config.source.pacIndex;
+            renderDestinations();
+            populateDestinationPickers();
+            updateConfigBanner();
+            updateEnvLabels();
+        }
+
+        function updateConfigBanner() {
+            const config = getConfig();
+            const banner = document.getElementById("configBanner");
+            banner.classList.toggle("show", !config.ghToken);
+        }
+
+        function toggleSettings() {
+            document.getElementById("settingsPanel").classList.toggle("show");
+        }
+
+        // =====================================================================
+        // GitHub API
+        // =====================================================================
+        async function ghFetch(endpoint, options = {}) {
+            const config = getConfig();
+            if (!config.ghToken) {
+                throw new Error("GitHub PAT not configured");
+            }
+            const url = `https://api.github.com/repos/${config.ghRepo}${endpoint}`;
+            const resp = await fetch(url, {
+                ...options,
+                headers: {
+                    "Authorization": `Bearer ${config.ghToken}`,
+                    "Accept": "application/vnd.github.v3+json",
+                    "X-GitHub-Api-Version": "2022-11-28",
+                    ...(options.headers || {})
+                }
+            });
+            if (!resp.ok) {
+                if (resp.status === 404) return null;
+                const body = await resp.text();
+                throw new Error(`GitHub API ${resp.status}: ${body}`);
+            }
+            if (resp.status === 204) return null;
+            return resp.json();
+        }
+
+        // =====================================================================
+        // GitHub Secrets Management
+        // =====================================================================
+        async function encryptSecret(publicKeyB64, secretValue) {
+            await sodium.ready;
+            const keyBytes = sodium.from_base64(publicKeyB64, sodium.base64_variants.ORIGINAL);
+            const messageBytes = sodium.from_string(secretValue);
+            const encrypted = sodium.crypto_box_seal(messageBytes, keyBytes);
+            return sodium.to_base64(encrypted, sodium.base64_variants.ORIGINAL);
+        }
+
+        async function setGitHubSecret(name, value) {
+            const keyResp = await ghFetch("/actions/secrets/public-key");
+            const encrypted = await encryptSecret(keyResp.key, value);
+            const config = getConfig();
+            const url = `https://api.github.com/repos/${config.ghRepo}/actions/secrets/${name}`;
+            const resp = await fetch(url, {
+                method: "PUT",
+                headers: {
+                    "Authorization": `Bearer ${config.ghToken}`,
+                    "Accept": "application/vnd.github.v3+json",
+                    "X-GitHub-Api-Version": "2022-11-28"
+                },
+                body: JSON.stringify({
+                    encrypted_value: encrypted,
+                    key_id: keyResp.key_id
+                })
+            });
+            if (!resp.ok && resp.status !== 204) {
+                const body = await resp.text();
+                throw new Error(`Failed to set ${name}: ${resp.status} ${body}`);
+            }
+        }
+
+        async function syncSecretsToGitHub() {
+            const status = document.getElementById("secretSyncStatus");
+            const config = getConfig();
+
+            if (!config.ghToken) {
+                status.innerHTML = '<span style="color:var(--danger)">Configure GitHub PAT first</span>';
+                return;
+            }
+
+            const secrets = {};
+            const ppClientId = document.getElementById("ppClientId").value.trim();
+            const ppClientSecret = document.getElementById("ppClientSecret").value.trim();
+            const ppTenantId = document.getElementById("ppTenantId").value.trim();
+
+            if (ppClientId) secrets.PP_CLIENT_ID = ppClientId;
+            if (ppClientSecret) secrets.PP_CLIENT_SECRET = ppClientSecret;
+            if (ppTenantId) secrets.PP_TENANT_ID = ppTenantId;
+            // Source URL → DEV_ENV_URL (export fallback).
+            if (config.source.url) secrets.DEV_ENV_URL = config.source.url;
+            // Default destination URL → PROD_ENV_URL (deploy fallback). Additional
+            // same-tenant destinations get their URL from the dashboard at trigger
+            // time and need no secret; different-tenant ones use a GitHub Environment
+            // with its own scoped secrets — see docs/MULTIPLE-ENVIRONMENTS.md.
+            const prodDest = config.destinations.find(d => (d.githubEnv || "").toLowerCase() === "production")
+                || config.destinations[0];
+            if (prodDest && prodDest.url) secrets.PROD_ENV_URL = prodDest.url;
+
+            const names = Object.keys(secrets);
+            if (names.length === 0) {
+                status.innerHTML = '<span style="color:var(--warning)">No values to sync</span>';
+                return;
+            }
+
+            status.innerHTML = `<span style="color:var(--primary)">Syncing ${names.length} secrets...</span>`;
+
+            const results = [];
+            for (const [name, value] of Object.entries(secrets)) {
+                try {
+                    await setGitHubSecret(name, value);
+                    results.push({ name, ok: true });
+                } catch (err) {
+                    results.push({ name, ok: false, error: err.message });
+                }
+            }
+
+            document.getElementById("ppClientId").value = "";
+            document.getElementById("ppClientSecret").value = "";
+            document.getElementById("ppTenantId").value = "";
+
+            const passed = results.filter(r => r.ok).map(r => r.name);
+            const failed = results.filter(r => !r.ok);
+
+            let html = "";
+            if (passed.length) {
+                html += `<span style="color:var(--success)">${passed.join(", ")} synced</span>`;
+            }
+            if (failed.length) {
+                html += failed.map(f =>
+                    `<br><span style="color:var(--danger)">${escHtml(f.name)}: ${escHtml(f.error)}</span>`
+                ).join("");
+            }
+            status.innerHTML = html;
+        }
+
+        async function checkSecretsStatus() {
+            const status = document.getElementById("secretSyncStatus");
+            try {
+                const resp = await ghFetch("/actions/secrets");
+                if (!resp || !resp.secrets) {
+                    status.innerHTML = '<span style="color:var(--warning)">Could not retrieve secrets list</span>';
+                    return;
+                }
+                const required = ["PP_CLIENT_ID", "PP_CLIENT_SECRET", "PP_TENANT_ID", "DEV_ENV_URL", "PROD_ENV_URL"];
+                const present = resp.secrets.map(s => s.name);
+                const missing = required.filter(r => !present.includes(r));
+                if (missing.length === 0) {
+                    status.innerHTML = '<span style="color:var(--success)">All 5 secrets configured</span>';
+                } else {
+                    status.innerHTML = `<span style="color:var(--danger)">Missing: ${missing.join(", ")}</span>`;
+                }
+            } catch (err) {
+                status.innerHTML = `<span style="color:var(--danger)">${escHtml(err.message)}</span>`;
+            }
+        }
+
+        // =====================================================================
+        // Trigger Workflows
+        // =====================================================================
+        function showExportModal() {
+            const solution = getCurrentSolution();
+            if (!solution) {
+                showToast("Select a solution first", "error");
+                return;
+            }
+            document.getElementById("exportSolutionName").textContent = solution;
+            document.getElementById("exportConfirmInput").value = "";
+            document.getElementById("btnExportConfirm").disabled = true;
+            document.getElementById("exportModal").classList.add("show");
+            document.getElementById("exportConfirmInput").oninput = function() {
+                document.getElementById("btnExportConfirm").disabled = this.value.trim() !== "EXPORT";
+            };
+        }
+
+        function hideExportModal() {
+            document.getElementById("exportModal").classList.remove("show");
+        }
+
+        async function triggerExport() {
+            hideExportModal();
+            const solution = getCurrentSolution();
+            if (!solution) {
+                showToast("Select a solution first", "error");
+                return;
+            }
+            const btn = document.getElementById("btnExport");
+            btn.disabled = true;
+            btn.textContent = "Triggering...";
+
+            try {
+                const source = getConfig().source;
+                await ghFetch("/actions/workflows/export-and-validate.yml/dispatches", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        ref: "main",
+                        inputs: {
+                            solution_name: solution,
+                            environment_url: source.url,
+                            pac_auth_index: source.pacIndex
+                        }
+                    })
+                });
+                showToast(`Export of '${solution}' triggered!`, "success");
+                setTimeout(refreshAll, 3000);
+            } catch (err) {
+                showToast("Failed: " + err.message, "error");
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Export & Validate";
+            }
+        }
+
+        function showDeployModal() {
+            const solution = getCurrentSolution();
+            if (!solution) {
+                showToast("Select a solution first", "error");
+                return;
+            }
+            const version = document.getElementById("deployVersion").value;
+            if (!version) {
+                showToast("Select a version to deploy", "error");
+                return;
+            }
+            const displayVersion = version.replace(/_/g, ".");
+            document.getElementById("deploySolutionName").textContent = solution;
+            document.getElementById("deployTarget").textContent = displayVersion;
+            document.getElementById("deployConfirmInput").value = "";
+            document.getElementById("btnDeployConfirm").disabled = true;
+            document.getElementById("deployModal").classList.add("show");
+            document.getElementById("deployConfirmInput").oninput = function() {
+                document.getElementById("btnDeployConfirm").disabled = this.value.trim() !== displayVersion;
+            };
+        }
+
+        function hideDeployModal() {
+            document.getElementById("deployModal").classList.remove("show");
+        }
+
+        async function triggerDeploy() {
+            hideDeployModal();
+            const solution = getCurrentSolution();
+            const version = document.getElementById("deployVersion").value;
+
+            const btn = document.getElementById("btnDeploy");
+            btn.disabled = true;
+            btn.textContent = "Triggering...";
+
+            try {
+                const dest = getSelectedDeployDestination();
+                await ghFetch("/actions/workflows/deploy-to-prod.yml/dispatches", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        ref: "main",
+                        inputs: {
+                            solution_name: solution,
+                            solution_version: version,
+                            target_environment: dest.githubEnv || "production",
+                            force_overwrite: "true",
+                            skip_backup: "false",
+                            environment_url: dest.url,
+                            pac_auth_index: dest.pacIndex
+                        }
+                    })
+                });
+                showToast(`Deploy of '${solution}' to ${dest.name || dest.githubEnv || "destination"} triggered! Awaiting approval in GitHub.`, "success");
+                setTimeout(refreshAll, 3000);
+            } catch (err) {
+                showToast("Failed: " + err.message, "error");
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Deploy to " + (getSelectedDeployDestination().name || "Prod");
+            }
+        }
+
+        function showRollbackModal() {
+            const solution = getCurrentSolution();
+            if (!solution) {
+                showToast("Select a solution first", "error");
+                return;
+            }
+            const version = document.getElementById("rollbackVersion").value;
+            if (!version) {
+                showToast("Select a version to restore", "error");
+                return;
+            }
+            const displayVersion = version.replace(/_/g, ".");
+            document.getElementById("rollbackSolutionName").textContent = solution;
+            document.getElementById("rollbackTarget").textContent = displayVersion;
+            document.getElementById("rollbackConfirmInput").value = "";
+            document.getElementById("btnRollbackConfirm").disabled = true;
+            document.getElementById("rollbackModal").classList.add("show");
+
+            // Live-validate input matches target
+            document.getElementById("rollbackConfirmInput").oninput = function() {
+                const matches = this.value.trim() === displayVersion;
+                document.getElementById("btnRollbackConfirm").disabled = !matches;
+            };
+        }
+
+        function hideRollbackModal() {
+            document.getElementById("rollbackModal").classList.remove("show");
+        }
+
+        function confirmRollbackStep2() {
+            // Second confirmation
+            const destName = getSelectedRollbackDestination().name || "Production";
+            if (!confirm("FINAL CONFIRMATION: This will overwrite " + destName + ". Are you absolutely sure?")) {
+                return;
+            }
+            hideRollbackModal();
+            executeRollback();
+        }
+
+        async function executeRollback() {
+            const solution = getCurrentSolution();
+            const version = document.getElementById("rollbackVersion").value;
+
+            const btn = document.getElementById("btnRollback");
+            btn.disabled = true;
+            btn.textContent = "Triggering...";
+
+            try {
+                const dest = getSelectedRollbackDestination();
+                await ghFetch("/actions/workflows/rollback.yml/dispatches", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        ref: "main",
+                        inputs: {
+                            solution_name: solution,
+                            backup_file: solution + "_" + version + "_managed.zip",
+                            target_environment: dest.githubEnv || "production",
+                            environment_url: dest.url,
+                            pac_auth_index: dest.pacIndex
+                        }
+                    })
+                });
+                showToast(`Rollback of '${solution}' on ${dest.name || dest.githubEnv || "destination"} triggered! Awaiting approval in GitHub.`, "success");
+                setTimeout(refreshAll, 3000);
+            } catch (err) {
+                showToast("Failed: " + err.message, "error");
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Rollback " + (getSelectedRollbackDestination().name || "Prod");
+            }
+        }
+
+        // =====================================================================
+        // Load Data
+        // =====================================================================
+        async function loadWorkflowRuns() {
+            const container = document.getElementById("runsContainer");
+            try {
+                const data = await ghFetch("/actions/runs?per_page=15");
+                if (!data.workflow_runs || data.workflow_runs.length === 0) {
+                    container.innerHTML = '<div class="loading-overlay">No workflow runs found.</div>';
+                    return;
+                }
+
+                // Build timeline entries: workflow runs + approval events interleaved
+                const timelineEntries = [];
+
+                for (const run of data.workflow_runs) {
+                    // For completed runs that used environments, fetch approval reviews
+                    // and place them BEFORE the run's execution start
+                    let hasApproval = false;
+
+                    if (run.conclusion && (run.name.includes("Deploy") || run.name.includes("Rollback"))) {
+                        try {
+                            const reviews = await ghFetch(`/actions/runs/${run.id}/approvals`);
+                            if (reviews && reviews.length > 0) {
+                                hasApproval = true;
+                                for (const review of reviews) {
+                                    // Approval happened between run creation and run start
+                                    // Use run_started_at minus 1 second so it sorts just before execution
+                                    const approvalTime = new Date(run.run_started_at || run.created_at);
+                                    approvalTime.setSeconds(approvalTime.getSeconds() - 1);
+                                    timelineEntries.push({
+                                        type: "approval_review",
+                                        run,
+                                        state: review.state,
+                                        reviewer: review.user?.login || "unknown",
+                                        env: review.environments?.map(e => e.name).join(", ") || "",
+                                        comment: review.comment || "",
+                                        sortTime: approvalTime
+                                    });
+                                }
+                            }
+                        } catch { /* ignore */ }
+                    }
+
+                    // For waiting runs, fetch pending deployment info
+                    if (run.status === "waiting") {
+                        try {
+                            const pending = await ghFetch(`/actions/runs/${run.id}/pending_deployments`);
+                            if (pending && pending.length > 0) {
+                                hasApproval = true;
+                                for (const dep of pending) {
+                                    timelineEntries.push({
+                                        type: "approval_pending",
+                                        run,
+                                        env: dep.environment?.name || "unknown",
+                                        reviewers: (dep.reviewers || []).map(r => r.reviewer?.login).filter(Boolean),
+                                        sortTime: new Date(run.updated_at || run.created_at)
+                                    });
+                                }
+                            }
+                        } catch { /* ignore */ }
+                    }
+
+                    // Add the run itself — use updated_at for completed, created_at for others
+                    const runSortTime = run.conclusion
+                        ? new Date(run.updated_at || run.created_at)
+                        : new Date(run.created_at);
+                    timelineEntries.push({ type: "run", run, sortTime: runSortTime });
+                }
+
+                // Sort by time descending
+                timelineEntries.sort((a, b) => b.sortTime - a.sortTime);
+
+                const rows = timelineEntries.map(entry => {
+                    if (entry.type === "approval_pending") {
+                        const date = entry.sortTime;
+                        return `<tr class="timeline-approval">
+                            <td><span class="status status-waiting">
+                                <span class="status-dot"></span>
+                                awaiting approval
+                            </span></td>
+                            <td><strong>${escHtml(entry.run.name)}</strong>
+                                <div style="font-size:11px; color:#5c2d91;">
+                                    Environment: <strong>${escHtml(entry.env)}</strong> |
+                                    Reviewers: ${entry.reviewers.map(r => escHtml(r)).join(", ") || "any admin"}
+                                </div>
+                            </td>
+                            <td>${escHtml(extractSolutionFromRun(entry.run)) || "—"}</td>
+                            <td>${escHtml(entry.run.head_branch)}</td>
+                            <td>${date.toLocaleDateString()} ${date.toLocaleTimeString()}</td>
+                            <td>--</td>
+                            <td>--</td>
+                            <td>
+                                <a href="${entry.run.html_url}" target="_blank" class="btn btn-outline btn-sm">
+                                    Approve
+                                </a>
+                            </td>
+                        </tr>`;
+                    }
+
+                    if (entry.type === "approval_review") {
+                        const date = entry.sortTime;
+                        const isApproved = entry.state === "approved";
+                        const statusClass = isApproved ? "approved" : "rejected";
+                        const statusLabel = isApproved ? "approved" : "rejected";
+                        return `<tr class="timeline-approval">
+                            <td><span class="status status-${statusClass}">
+                                <span class="status-dot"></span>
+                                ${statusLabel}
+                            </span></td>
+                            <td><strong>${escHtml(entry.run.name)}</strong>
+                                <div style="font-size:11px; color:var(--text-secondary);">
+                                    ${escHtml(entry.env)} ${isApproved ? "approved" : "rejected"} by <strong>${escHtml(entry.reviewer)}</strong>
+                                    ${entry.comment ? " — " + escHtml(entry.comment) : ""}
+                                </div>
+                            </td>
+                            <td>${escHtml(extractSolutionFromRun(entry.run)) || "—"}</td>
+                            <td>${escHtml(entry.run.head_branch)}</td>
+                            <td>${date.toLocaleDateString()} ${date.toLocaleTimeString()}</td>
+                            <td>--</td>
+                            <td>${escHtml(entry.reviewer)}</td>
+                            <td>
+                                <a href="${entry.run.html_url}" target="_blank" class="btn btn-outline btn-sm">
+                                    View
+                                </a>
+                            </td>
+                        </tr>`;
+                    }
+
+                    // Regular workflow run row
+                    const run = entry.run;
+                    const date = new Date(run.created_at);
+                    const duration = run.updated_at ?
+                        formatDuration(new Date(run.updated_at) - new Date(run.run_started_at || run.created_at)) : "--";
+
+                    let statusClass = run.conclusion || run.status;
+                    let statusLabel = run.conclusion || run.status;
+                    if (run.status === "waiting") {
+                        statusClass = "waiting";
+                        statusLabel = "awaiting approval";
+                    } else if (run.status === "action_required") {
+                        statusClass = "action_required";
+                        statusLabel = "approval required";
+                    }
+
+                    return `<tr>
+                        <td><span class="status status-${statusClass}">
+                            <span class="status-dot"></span>
+                            ${statusLabel}
+                        </span></td>
+                        <td><strong>${escHtml(run.name)}</strong></td>
+                        <td>${escHtml(extractSolutionFromRun(run)) || "—"}</td>
+                        <td>${escHtml(run.head_branch)}</td>
+                        <td>${date.toLocaleDateString()} ${date.toLocaleTimeString()}</td>
+                        <td>${duration}</td>
+                        <td>${escHtml(run.triggering_actor?.login || "—")}</td>
+                        <td>
+                            <a href="${run.html_url}" target="_blank" class="btn btn-outline btn-sm">
+                                ${run.status === "waiting" ? "Approve" : "View"}
+                            </a>
+                        </td>
+                    </tr>`;
+                }).join("");
+
+                container.innerHTML = `
+                    <table class="runs-table">
+                        <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th>Workflow</th>
+                                <th>Solution</th>
+                                <th>Branch</th>
+                                <th>Started</th>
+                                <th>Duration</th>
+                                <th>Triggered By</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>`;
+            } catch (err) {
+                container.innerHTML = `<div class="loading-overlay" style="color:var(--danger)">
+                    Failed to load runs: ${escHtml(err.message)}</div>`;
+            }
+        }
+
+        async function loadReleases() {
+            const container = document.getElementById("releasesContainer");
+            try {
+                const releases = await ghFetch("/releases?per_page=5");
+                if (!releases || releases.length === 0) {
+                    container.innerHTML = '<div class="loading-overlay">No releases yet.</div>';
+                    return;
+                }
+
+                const rows = releases.map(rel => {
+                    const date = new Date(rel.published_at || rel.created_at);
+                    const assets = rel.assets.map(a =>
+                        `<a href="${a.browser_download_url}" style="font-size:12px; color:var(--primary);">${escHtml(a.name)}</a>`
+                    ).join(", ") || "—";
+
+                    return `<tr>
+                        <td><strong>${escHtml(rel.tag_name)}</strong></td>
+                        <td>${escHtml(rel.name || rel.tag_name)}</td>
+                        <td>${date.toLocaleDateString()}</td>
+                        <td>${assets}</td>
+                        <td>
+                            <a href="${rel.html_url}" target="_blank" class="btn btn-outline btn-sm">
+                                View
+                            </a>
+                        </td>
+                    </tr>`;
+                }).join("");
+
+                container.innerHTML = `
+                    <table class="runs-table">
+                        <thead>
+                            <tr>
+                                <th>Tag</th>
+                                <th>Name</th>
+                                <th>Published</th>
+                                <th>Assets</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>`;
+            } catch (err) {
+                container.innerHTML = `<div class="loading-overlay" style="color:var(--danger)">
+                    Failed to load releases: ${escHtml(err.message)}</div>`;
+            }
+        }
+
+        function extractVersionsFromContents(contents, solutionName) {
+            const prefix = solutionName + "_";
+            const suffix = "_managed.zip";
+            return contents
+                .filter(f => f.name.endsWith(suffix) && f.name.startsWith(prefix))
+                .map(f => f.name.replace(prefix, "").replace(suffix, ""))
+                .reverse();
+        }
+
+        async function loadVersions() {
+            const select = document.getElementById("deployVersion");
+            const solution = getCurrentSolution();
+            if (!solution) {
+                select.innerHTML = '<option value="">Select a solution first</option>';
+                return;
+            }
+            try {
+                const contents = await ghFetch("/contents/Solutions/Managed");
+                if (!contents || !Array.isArray(contents)) {
+                    select.innerHTML = `<option value="">No exports yet — run Export &amp; Validate first</option>`;
+                    return;
+                }
+                const zips = extractVersionsFromContents(contents, solution);
+                if (zips.length === 0) {
+                    select.innerHTML = `<option value="">No versions of '${escHtml(solution)}' in repo</option>`;
+                    return;
+                }
+                select.innerHTML = '<option value="">Select version...</option>' +
+                    zips.map(v => `<option value="${v}">${v.replace(/_/g, ".")}</option>`).join("");
+            } catch (err) {
+                select.innerHTML = '<option value="">Failed to load versions</option>';
+            }
+        }
+
+        async function loadBackups() {
+            const select = document.getElementById("rollbackVersion");
+            const solution = getCurrentSolution();
+            if (!solution) {
+                select.innerHTML = '<option value="">Select a solution first</option>';
+                return;
+            }
+            try {
+                const contents = await ghFetch("/contents/Solutions/Managed");
+                if (!contents || !Array.isArray(contents)) {
+                    select.innerHTML = '<option value="">No versions available</option>';
+                    return;
+                }
+                const zips = extractVersionsFromContents(contents, solution);
+                if (zips.length === 0) {
+                    select.innerHTML = '<option value="">No versions available</option>';
+                    return;
+                }
+                select.innerHTML = '<option value="">Select version...</option>' +
+                    zips.map(v => `<option value="${v}">${v.replace(/_/g, ".")}</option>`).join("");
+            } catch {
+                select.innerHTML = '<option value="">No versions available</option>';
+            }
+        }
+
+        // =====================================================================
+        // Helpers
+        // =====================================================================
+        function escHtml(str) {
+            const div = document.createElement("div");
+            div.textContent = str || "";
+            return div.innerHTML;
+        }
+
+        // Escape for use inside a double-quoted HTML attribute (escHtml + quotes).
+        function escAttr(str) {
+            return escHtml(str).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+        }
+
+        function formatDuration(ms) {
+            if (!ms || ms < 0) return "--";
+            const secs = Math.floor(ms / 1000);
+            if (secs < 60) return secs + "s";
+            const mins = Math.floor(secs / 60);
+            const remSecs = secs % 60;
+            return mins + "m " + remSecs + "s";
+        }
+
+        function showToast(message, type) {
+            const toast = document.getElementById("toast");
+            toast.textContent = message;
+            toast.className = `toast toast-${type} show`;
+            setTimeout(() => toast.classList.remove("show"), 4000);
+        }
+
+        // =====================================================================
+        // Solution Discovery
+        // =====================================================================
+        function getXrm() {
+            // Dashboard runs as a web resource embedded in the model-driven app.
+            // Xrm is exposed via window.parent or as a global depending on host.
+            try {
+                if (typeof Xrm !== "undefined" && Xrm.WebApi) return Xrm;
+            } catch {}
+            try {
+                if (window.parent && window.parent.Xrm && window.parent.Xrm.WebApi) return window.parent.Xrm;
+            } catch {}
+            return null;
+        }
+
+        async function loadSolutions() {
+            const picker = document.getElementById("solutionPicker");
+            const meta = document.getElementById("solutionMeta");
+            const xrm = getXrm();
+
+            // Path 1: Inside the model-driven app — query Dataverse directly
+            if (xrm) {
+                try {
+                    const result = await xrm.WebApi.retrieveMultipleRecords(
+                        "solution",
+                        "?$select=uniquename,friendlyname,version,ismanaged,isvisible" +
+                        "&$expand=publisherid($select=customizationprefix,uniquename)" +
+                        "&$filter=ismanaged eq false and isvisible eq true" +
+                        "&$orderby=friendlyname"
+                    );
+
+                    // Filter out system/Microsoft solutions — keep only those from your publisher(s)
+                    const filtered = result.entities.filter(s => {
+                        const prefix = s.publisherid?.customizationprefix || "";
+                        const pubName = (s.publisherid?.uniquename || "").toLowerCase();
+                        if (!prefix) return false;
+                        // Exclude common Microsoft publishers
+                        if (pubName.startsWith("microsoftcorporation")) return false;
+                        if (pubName === "default") return false;
+                        if (pubName.startsWith("msft")) return false;
+                        if (pubName.startsWith("dynamics")) return false;
+                        // Exclude default/system solution
+                        if (s.uniquename === "Default") return false;
+                        if (s.uniquename === "Active") return false;
+                        return true;
+                    });
+
+                    availableSolutions = filtered.map(s => ({
+                        uniqueName: s.uniquename,
+                        friendlyName: s.friendlyname,
+                        version: s.version,
+                        prefix: s.publisherid?.customizationprefix || ""
+                    }));
+
+                    populateSolutionPicker(availableSolutions, "Dataverse");
+                    return;
+                } catch (err) {
+                    console.warn("Dataverse solution query failed:", err);
+                }
+            }
+
+            // Path 2: Fallback — scan GitHub repo's Solutions/Managed folder for unique solution prefixes
+            try {
+                const contents = await ghFetch("/contents/Solutions/Managed");
+                if (!contents || !Array.isArray(contents)) throw new Error("No exports yet");
+                const prefixes = new Set();
+                contents.forEach(f => {
+                    if (!f.name.endsWith("_managed.zip")) return;
+                    // Filename pattern: {solutionName}_{version}_managed.zip
+                    // We can't perfectly distinguish solution name vs version, but for
+                    // names like "hollandcloud/primarysolution_2026_03_19_02_managed.zip" we can take
+                    // everything before the first numeric token.
+                    const stripped = f.name.replace("_managed.zip", "");
+                    const match = stripped.match(/^([A-Za-z][A-Za-z0-9]*(?:[_-][A-Za-z][A-Za-z0-9]*)*)_/);
+                    if (match) prefixes.add(match[1]);
+                });
+
+                availableSolutions = [...prefixes].sort().map(p => ({
+                    uniqueName: p,
+                    friendlyName: p,
+                    version: null,
+                    prefix: ""
+                }));
+
+                if (availableSolutions.length === 0) {
+                    // Final fallback: use the configured default
+                    const def = getConfig().defaultSolution;
+                    availableSolutions = [{ uniqueName: def, friendlyName: def, version: null, prefix: "" }];
+                }
+                populateSolutionPicker(availableSolutions, "GitHub repo");
+            } catch (err) {
+                // Last resort
+                const def = getConfig().defaultSolution;
+                availableSolutions = [{ uniqueName: def, friendlyName: def, version: null, prefix: "" }];
+                populateSolutionPicker(availableSolutions, "default config");
+            }
+        }
+
+        function populateSolutionPicker(solutions, source) {
+            window.availableSolutions = solutions;
+            const picker = document.getElementById("solutionPicker");
+            const meta = document.getElementById("solutionMeta");
+            const config = getConfig();
+
+            const options = solutions.map(s => {
+                const label = s.version
+                    ? `${s.friendlyName} (${s.uniqueName}) — v${s.version}`
+                    : `${s.friendlyName} (${s.uniqueName})`;
+                return `<option value="${escHtml(s.uniqueName)}">${escHtml(label)}</option>`;
+            }).join("");
+
+            picker.innerHTML = '<option value="">Select solution...</option>' + options;
+
+            // Restore last-used selection if still available
+            const last = config.lastSolution;
+            if (last && solutions.some(s => s.uniqueName === last)) {
+                picker.value = last;
+            } else if (solutions.length === 1) {
+                picker.value = solutions[0].uniqueName;
+            }
+
+            meta.innerHTML = `<strong>${solutions.length}</strong> solution${solutions.length === 1 ? "" : "s"} from <strong>${escHtml(source)}</strong>`;
+
+            // Trigger initial load for the (possibly auto-selected) solution
+            if (picker.value) {
+                onSolutionChange();
+            }
+        }
+
+        function onSolutionChange() {
+            const solution = document.getElementById("solutionPicker").value;
+            persistSelectedSolution(solution);
+
+            const sol = availableSolutions.find(s => s.uniqueName === solution);
+            const meta = document.getElementById("solutionMeta");
+            if (sol && sol.version) {
+                meta.innerHTML = `Dev version: <strong>${escHtml(sol.version)}</strong>`;
+            }
+
+            loadVersions();
+            loadBackups();
+        }
+
+        // =====================================================================
+        // Auto-Refresh
+        // =====================================================================
+        let refreshTimer = null;
+        let countdownTimer = null;
+        let countdownValue = 0;
+
+        function refreshAll() {
+            const config = getConfig();
+            if (!config.ghToken) return;
+            loadWorkflowRuns();
+            loadReleases();
+            loadVersions();
+            loadBackups();
+            resetCountdown();
+        }
+
+        function toggleAutoRefresh() {
+            if (document.getElementById("autoRefresh").checked) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+            }
+        }
+
+        function startAutoRefresh() {
+            stopAutoRefresh();
+            const config = getConfig();
+            const interval = config.refreshInterval * 1000;
+            countdownValue = config.refreshInterval;
+
+            refreshTimer = setInterval(refreshAll, interval);
+            countdownTimer = setInterval(() => {
+                countdownValue--;
+                if (countdownValue <= 0) countdownValue = config.refreshInterval;
+                document.getElementById("countdown").textContent = countdownValue + "s";
+            }, 1000);
+        }
+
+        function stopAutoRefresh() {
+            clearInterval(refreshTimer);
+            clearInterval(countdownTimer);
+            document.getElementById("countdown").textContent = "";
+        }
+
+        function resetCountdown() {
+            const config = getConfig();
+            countdownValue = config.refreshInterval;
+        }
+
+        // =====================================================================
+        // Role Check
+        // =====================================================================
+        async function checkUserRole() {
+            const actionButtons = ["btnExport", "btnDeploy", "btnRollback"];
+            try {
+                // Check if running inside model-driven app (Xrm available)
+                if (typeof Xrm !== "undefined" && Xrm.Utility && Xrm.Utility.getGlobalContext) {
+                    const context = Xrm.Utility.getGlobalContext();
+                    const userId = context.userSettings.userId.replace(/[{}]/g, "");
+                    const roles = context.userSettings.securityRoles || [];
+
+                    // Check for System Administrator role by name
+                    const userRoles = context.userSettings.roles;
+                    let isAdmin = false;
+
+                    if (userRoles && userRoles.getAll) {
+                        const allRoles = userRoles.getAll();
+                        isAdmin = allRoles.some(r => r.name === "System Administrator");
+                    } else {
+                        // Fallback: query via Web API
+                        const resp = await fetch(
+                            `${context.getClientUrl()}/api/data/v9.2/systemusers(${userId})/systemuserroles_association?$select=name`,
+                            { headers: { "Accept": "application/json", "OData-MaxVersion": "4.0", "OData-Version": "4.0" } }
+                        );
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            isAdmin = data.value.some(r => r.name === "System Administrator");
+                        }
+                    }
+
+                    if (!isAdmin) {
+                        actionButtons.forEach(id => {
+                            const btn = document.getElementById(id);
+                            if (btn) {
+                                btn.disabled = true;
+                                btn.title = "Requires System Administrator role";
+                            }
+                        });
+                        showToast("Read-only mode — System Administrator role required to trigger actions", "error");
+                    }
+                }
+            } catch {
+                // If Xrm is not available (standalone browser), allow all actions
+            }
+        }
+
+        // =====================================================================
+        // Init
+        // =====================================================================
+        document.addEventListener("DOMContentLoaded", async () => {
+            loadSettings();
+            await loadSolutions();
+            refreshAll();
+            checkUserRole();
+            if (document.getElementById("autoRefresh").checked) {
+                startAutoRefresh();
+            }
+        });
+    </script>
+</body>
+</html>

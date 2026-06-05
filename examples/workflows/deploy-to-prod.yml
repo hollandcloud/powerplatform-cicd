@@ -1,0 +1,271 @@
+# =============================================================================
+# EXAMPLE WORKFLOW — NOT ACTIVE IN THIS REPOSITORY
+# -----------------------------------------------------------------------------
+# This repository is distributed as a template, so the workflows live under
+# `examples/workflows/` where GitHub does NOT register or run them.
+#
+# To use it: copy this file into `.github/workflows/` in YOUR deployment repo,
+# then follow docs/SETUP.md. Keep the filename (deploy-to-prod.yml) unchanged —
+# the dashboard triggers the workflow by filename.
+#
+# MULTIPLE DESTINATIONS: this workflow deploys to any environment via the
+# `target_environment` input (a GitHub Environment used as the approval gate)
+# and the `environment_url` input (the Dataverse target). See
+# docs/MULTIPLE-ENVIRONMENTS.md for how to add destinations beyond prod.
+# =============================================================================
+name: Deploy Solution
+run-name: "Deploy [${{ inputs.solution_name }}] v${{ inputs.solution_version }} -> ${{ inputs.target_environment || 'production' }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      solution_version:
+        description: 'Solution version to deploy (e.g., 2026_03_16_1)'
+        required: true
+        type: string
+      solution_name:
+        description: 'Solution name'
+        required: true
+        default: 'primarysolution'
+        type: string
+      target_environment:
+        description: 'GitHub Environment to deploy through (the approval gate). Each deploy destination maps to one GitHub Environment.'
+        required: false
+        default: 'production'
+        type: string
+      force_overwrite:
+        description: 'Overwrite unmanaged customizations in Prod'
+        required: false
+        type: boolean
+        default: true
+      skip_backup:
+        description: 'Skip pre-deploy backup (faster, less safe)'
+        required: false
+        type: boolean
+        default: false
+      environment_url:
+        description: 'Dataverse environment URL (target). Overrides the TARGET_ENV_URL / PROD_ENV_URL secret.'
+        required: false
+        type: string
+      pac_auth_index:
+        description: 'PAC auth profile index to select (optional)'
+        required: false
+        type: string
+
+# One concurrency group per destination so deploying to (e.g.) test does not
+# block a deploy to prod, while two deploys to the SAME destination still queue.
+concurrency:
+  group: deploy-${{ inputs.target_environment || 'production' }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy Managed Solution
+    runs-on: windows-latest
+    # The GitHub Environment named here supplies the approval gate and any
+    # environment-scoped secrets (e.g. a different tenant's service principal).
+    environment:
+      name: ${{ inputs.target_environment || 'production' }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # --- Verify managed ZIP exists ---
+      - name: Verify Solution ZIP
+        run: |
+          $zipPath = "./Solutions/Managed/${{ inputs.solution_name }}_${{ inputs.solution_version }}_managed.zip"
+          if (-not (Test-Path $zipPath)) {
+            Write-Host "::error::Managed ZIP not found at: $zipPath"
+            Write-Host "Available managed ZIPs:"
+            Get-ChildItem ./Solutions/Managed/*.zip | Select-Object Name
+            exit 1
+          }
+          $size = (Get-Item $zipPath).Length / 1MB
+          Write-Host "Found: $zipPath ($([math]::Round($size, 2)) MB)"
+        shell: pwsh
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install PAC CLI
+        run: dotnet tool install --global Microsoft.PowerApps.CLI.Tool
+
+      - name: Authenticate to Prod
+        env:
+          PP_APP_ID: ${{ secrets.PP_CLIENT_ID }}
+          PP_SECRET: ${{ secrets.PP_CLIENT_SECRET }}
+          PP_TENANT: ${{ secrets.PP_TENANT_ID }}
+          PROD_URL: ${{ inputs.environment_url || secrets.TARGET_ENV_URL || secrets.PROD_ENV_URL }}
+          PAC_AUTH_INDEX: ${{ inputs.pac_auth_index }}
+        run: |
+          if (-not $env:PP_TENANT) {
+            Write-Error "PP_TENANT_ID secret is not configured in this repository"
+            exit 1
+          }
+          pac auth create --name ProdEnv `
+            --applicationId $env:PP_APP_ID `
+            --clientSecret $env:PP_SECRET `
+            --tenant $env:PP_TENANT `
+            --environment $env:PROD_URL
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($env:PAC_AUTH_INDEX) {
+            pac auth select --index $env:PAC_AUTH_INDEX
+          }
+        shell: pwsh
+
+      # --- Record current Prod version (for rollback) ---
+      - name: Record Current Prod Version
+        if: inputs.skip_backup == false
+        id: backup
+        run: |
+          Write-Host "Querying current Prod solution version..."
+          $solutionList = pac solution list --json 2>$null | ConvertFrom-Json
+          $current = $solutionList | Where-Object { $_.SolutionUniqueName -eq "${{ inputs.solution_name }}" }
+
+          if ($current) {
+            $currentVersion = $current.Version
+            $currentVersionUnderscore = $currentVersion -replace '\.', '_'
+            Write-Host "Current Prod version: $currentVersion"
+
+            # Check if we have the managed ZIP for rollback
+            $rollbackZip = "./Solutions/Managed/${{ inputs.solution_name }}_${currentVersionUnderscore}_managed.zip"
+            if (Test-Path $rollbackZip) {
+              Write-Host "Rollback ZIP available: $rollbackZip"
+            } else {
+              Write-Host "::warning::Rollback ZIP not found at $rollbackZip — rollback may need manual intervention"
+            }
+
+            echo "CURRENT_PROD_VERSION=$currentVersion" >> $env:GITHUB_OUTPUT
+            echo "ROLLBACK_ZIP=$rollbackZip" >> $env:GITHUB_OUTPUT
+          } else {
+            Write-Host "Solution not currently installed in Prod (first deploy)"
+            echo "CURRENT_PROD_VERSION=none" >> $env:GITHUB_OUTPUT
+          }
+        shell: pwsh
+
+      # --- Import managed solution ---
+      - name: Import Managed Solution to Prod
+        id: import
+        run: |
+          $zipPath = "./Solutions/Managed/${{ inputs.solution_name }}_${{ inputs.solution_version }}_managed.zip"
+          $startTime = Get-Date
+
+          $importCmd = "pac solution import --path `"$zipPath`" --async --max-async-wait-time 300"
+
+          if ("${{ inputs.force_overwrite }}" -eq "true") {
+            $importCmd += " --force-overwrite"
+          }
+
+          Invoke-Expression $importCmd
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::error::Solution import failed with exit code $LASTEXITCODE"
+            exit 1
+          }
+
+          $duration = (Get-Date) - $startTime
+          echo "IMPORT_DURATION=$([math]::Round($duration.TotalSeconds))s" >> $env:GITHUB_OUTPUT
+          Write-Host "Import completed in $([math]::Round($duration.TotalSeconds)) seconds"
+        shell: pwsh
+
+      # --- Publish all customizations ---
+      - name: Publish Customizations
+        run: |
+          pac solution publish --async --max-async-wait-time 120
+        shell: pwsh
+
+      # --- Patch activity views to filter orphan typecodes (OPTIONAL) ---
+      # Idempotent. Runs only for solutions whose name contains 'activities' or
+      # equals 'hollandcloud_core', because activitypointer system views get
+      # re-overlaid by the managed import. Adjust/remove this gate for your own
+      # solutions — see Scripts/patch_activity_views.py.
+      - name: Patch Activity Views (orphan filter)
+        if: contains(inputs.solution_name, 'activities') || inputs.solution_name == 'hollandcloud_core'
+        env:
+          PROD_URL: ${{ inputs.environment_url || secrets.TARGET_ENV_URL || secrets.PROD_ENV_URL }}
+          PP_APP_ID: ${{ secrets.PP_CLIENT_ID }}
+          PP_SECRET: ${{ secrets.PP_CLIENT_SECRET }}
+          PP_TENANT: ${{ secrets.PP_TENANT_ID }}
+        run: |
+          # Get a Dataverse token via az with service principal (mirrors auth flow earlier in this workflow)
+          az login --service-principal --username $env:PP_APP_ID --password $env:PP_SECRET --tenant $env:PP_TENANT --allow-no-subscriptions | Out-Null
+          $token = az account get-access-token --resource $env:PROD_URL --query accessToken -o tsv
+          $env:DATAVERSE_TOKEN = $token
+          python Scripts/patch_activity_views.py --env-url $env:PROD_URL
+        shell: pwsh
+
+      # --- Post-deploy validation ---
+      - name: Validate Deployment
+        id: validate
+        run: |
+          $solutionList = pac solution list --json | ConvertFrom-Json
+          $deployed = $solutionList | Where-Object { $_.SolutionUniqueName -eq "${{ inputs.solution_name }}" }
+
+          if ($deployed) {
+            $deployedVersion = $deployed.Version
+            $expectedVersion = "${{ inputs.solution_version }}" -replace '_', '.'
+            Write-Host "Deployed version: $deployedVersion"
+            Write-Host "Expected version: $expectedVersion"
+
+            if ($deployedVersion -eq $expectedVersion) {
+              Write-Host "Deployment validated successfully!"
+              echo "VALIDATION=PASSED" >> $env:GITHUB_OUTPUT
+            } else {
+              Write-Host "::warning::Version mismatch — deployed: $deployedVersion, expected: $expectedVersion"
+              echo "VALIDATION=WARNING" >> $env:GITHUB_OUTPUT
+            }
+          } else {
+            Write-Host "::error::Solution '${{ inputs.solution_name }}' not found in Prod after import"
+            echo "VALIDATION=FAILED" >> $env:GITHUB_OUTPUT
+            exit 1
+          }
+        shell: pwsh
+
+      # --- Deployment Report ---
+      - name: Generate Deployment Report
+        if: always()
+        run: |
+          $version = "${{ inputs.solution_version }}" -replace '_', '.'
+          $status = if ("${{ steps.import.outcome }}" -eq "success") { "SUCCESS" } else { "FAILED" }
+          $statusIcon = if ($status -eq "SUCCESS") { "+" } else { "x" }
+
+          $summary = @"
+          ## Deployment Report
+
+          | Field | Value |
+          |-------|-------|
+          | **Solution** | ${{ inputs.solution_name }} |
+          | **Version** | $version |
+          | **Target Environment** | ${{ inputs.target_environment || 'production' }} |
+          | **Status** | $status |
+          | **Import Duration** | ${{ steps.import.outputs.IMPORT_DURATION }} |
+          | **Validation** | ${{ steps.validate.outputs.VALIDATION }} |
+          | **Force Overwrite** | ${{ inputs.force_overwrite }} |
+          | **Previous Prod Version** | ${{ steps.backup.outputs.CURRENT_PROD_VERSION || 'Skipped' }} |
+          | **Deployed By** | ${{ github.actor }} |
+          | **Timestamp** | $(Get-Date -Format 'yyyy-MM-dd HH:mm UTC') |
+          "@
+
+          $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+        shell: pwsh
+
+      # --- Create GitHub Release ---
+      - name: Create GitHub Release
+        if: steps.import.outcome == 'success'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.solution_version }}
+          name: "${{ inputs.solution_name }} v${{ inputs.solution_version }}"
+          body: |
+            ## Deployed to Production
+
+            - **Solution:** ${{ inputs.solution_name }}
+            - **Version:** ${{ inputs.solution_version }}
+            - **Deployed by:** ${{ github.actor }}
+            - **Validation:** ${{ steps.validate.outputs.VALIDATION }}
+          files: |
+            ./Solutions/Managed/${{ inputs.solution_name }}_${{ inputs.solution_version }}_managed.zip
+          generate_release_notes: false

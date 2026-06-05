@@ -1,0 +1,211 @@
+# =============================================================================
+# EXAMPLE WORKFLOW — NOT ACTIVE IN THIS REPOSITORY
+# -----------------------------------------------------------------------------
+# This repository is distributed as a template, so the workflows live under
+# `examples/workflows/` where GitHub does NOT register or run them.
+#
+# To use it: copy this file into `.github/workflows/` in YOUR deployment repo,
+# then follow docs/SETUP.md. Keep the filename (rollback.yml) unchanged —
+# the dashboard triggers the workflow by filename.
+#
+# MULTIPLE DESTINATIONS: pass `target_environment` to roll back a specific
+# destination (its GitHub Environment approval gate) and `environment_url` for
+# the Dataverse target. See docs/MULTIPLE-ENVIRONMENTS.md.
+# =============================================================================
+name: Rollback Solution
+run-name: "Rollback [${{ inputs.solution_name }}] to v${{ inputs.solution_version }} (${{ inputs.target_environment || 'production' }})"
+
+on:
+  workflow_dispatch:
+    inputs:
+      backup_file:
+        description: 'Backup filename from Solutions/Backups/ (e.g., primarysolution_prod_backup_20260316_143000.zip)'
+        required: true
+        type: string
+      solution_name:
+        description: 'Solution name'
+        required: true
+        default: 'primarysolution'
+        type: string
+      target_environment:
+        description: 'GitHub Environment to roll back through (the approval gate). Each deploy destination maps to one GitHub Environment.'
+        required: false
+        default: 'production'
+        type: string
+      environment_url:
+        description: 'Dataverse environment URL (target). Overrides the TARGET_ENV_URL / PROD_ENV_URL secret.'
+        required: false
+        type: string
+      pac_auth_index:
+        description: 'PAC auth profile index to select (optional)'
+        required: false
+        type: string
+
+# One concurrency group per destination, shared with deploy-to-prod.yml so a
+# rollback and a deploy to the SAME destination cannot run at once.
+concurrency:
+  group: deploy-${{ inputs.target_environment || 'production' }}
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    name: Rollback Solution to Backup
+    runs-on: windows-latest
+    # The GitHub Environment named here supplies the approval gate and any
+    # environment-scoped secrets (e.g. a different tenant's service principal).
+    environment:
+      name: ${{ inputs.target_environment || 'production' }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # --- List available backups ---
+      - name: List Available Backups
+        run: |
+          Write-Host "Available backups in Solutions/Backups/:"
+          Write-Host "==========================================="
+          if (Test-Path ./Solutions/Backups/*.zip) {
+            Get-ChildItem ./Solutions/Backups/*.zip | Sort-Object LastWriteTime -Descending | ForEach-Object {
+              $size = [math]::Round($_.Length / 1MB, 2)
+              Write-Host "  $($_.Name) ($size MB) - $($_.LastWriteTime)"
+            }
+          } else {
+            Write-Host "  No backups found."
+          }
+          Write-Host ""
+        shell: pwsh
+
+      # --- Verify backup exists ---
+      - name: Verify Backup File
+        run: |
+          $backupPath = "./Solutions/Backups/${{ inputs.backup_file }}"
+          if (-not (Test-Path $backupPath)) {
+            Write-Host "::error::Backup not found: $backupPath"
+            Write-Host "Check the list above for available backups."
+            exit 1
+          }
+          $size = [math]::Round((Get-Item $backupPath).Length / 1MB, 2)
+          Write-Host "Found backup: $backupPath ($size MB)"
+        shell: pwsh
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install PAC CLI
+        run: dotnet tool install --global Microsoft.PowerApps.CLI.Tool
+
+      - name: Authenticate to Prod
+        env:
+          PP_APP_ID: ${{ secrets.PP_CLIENT_ID }}
+          PP_SECRET: ${{ secrets.PP_CLIENT_SECRET }}
+          PP_TENANT: ${{ secrets.PP_TENANT_ID }}
+          PROD_URL: ${{ inputs.environment_url || secrets.TARGET_ENV_URL || secrets.PROD_ENV_URL }}
+          PAC_AUTH_INDEX: ${{ inputs.pac_auth_index }}
+        run: |
+          if (-not $env:PP_TENANT) {
+            Write-Error "PP_TENANT_ID secret is not configured in this repository"
+            exit 1
+          }
+          pac auth create --name ProdEnv `
+            --applicationId $env:PP_APP_ID `
+            --clientSecret $env:PP_SECRET `
+            --tenant $env:PP_TENANT `
+            --environment $env:PROD_URL
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($env:PAC_AUTH_INDEX) {
+            pac auth select --index $env:PAC_AUTH_INDEX
+          }
+        shell: pwsh
+
+      # --- Get current version before rollback ---
+      - name: Get Current Prod Version
+        id: current
+        run: |
+          $solutionList = pac solution list --json | ConvertFrom-Json
+          $current = ($solutionList | Where-Object { $_.SolutionUniqueName -eq "${{ inputs.solution_name }}" }).Version
+          Write-Host "Current Prod version: $current"
+          echo "CURRENT_VERSION=$current" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
+      # --- Import backup ---
+      - name: Import Backup Solution
+        id: rollback_import
+        run: |
+          $startTime = Get-Date
+
+          pac solution import `
+            --path "./Solutions/Backups/${{ inputs.backup_file }}" `
+            --force-overwrite `
+            --publish-changes `
+            --async `
+            --max-async-wait-time 300
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::error::Rollback import failed"
+            exit 1
+          }
+
+          $duration = (Get-Date) - $startTime
+          echo "DURATION=$([math]::Round($duration.TotalSeconds))s" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
+      # --- Publish ---
+      - name: Publish Customizations
+        run: pac solution publish --async --max-async-wait-time 120
+        shell: pwsh
+
+      # --- Patch activity views to filter orphan typecodes (OPTIONAL) ---
+      # Required after restoring a backup that may not include the post-deploy view fix.
+      # Runs only for solutions whose name contains 'activities' or equals
+      # 'hollandcloud_core' — adjust/remove this gate for your own solutions.
+      - name: Patch Activity Views (orphan filter)
+        if: contains(inputs.solution_name, 'activities') || inputs.solution_name == 'hollandcloud_core'
+        env:
+          PROD_URL: ${{ inputs.environment_url || secrets.TARGET_ENV_URL || secrets.PROD_ENV_URL }}
+          PP_APP_ID: ${{ secrets.PP_CLIENT_ID }}
+          PP_SECRET: ${{ secrets.PP_CLIENT_SECRET }}
+          PP_TENANT: ${{ secrets.PP_TENANT_ID }}
+        run: |
+          az login --service-principal --username $env:PP_APP_ID --password $env:PP_SECRET --tenant $env:PP_TENANT --allow-no-subscriptions | Out-Null
+          $token = az account get-access-token --resource $env:PROD_URL --query accessToken -o tsv
+          $env:DATAVERSE_TOKEN = $token
+          python Scripts/patch_activity_views.py --env-url $env:PROD_URL
+        shell: pwsh
+
+      # --- Validate ---
+      - name: Validate Rollback
+        id: validate
+        run: |
+          $solutionList = pac solution list --json | ConvertFrom-Json
+          $rolledBack = ($solutionList | Where-Object { $_.SolutionUniqueName -eq "${{ inputs.solution_name }}" }).Version
+          Write-Host "Rolled back to version: $rolledBack"
+          echo "ROLLED_BACK_VERSION=$rolledBack" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
+      # --- Report ---
+      - name: Rollback Report
+        if: always()
+        run: |
+          $status = if ("${{ steps.rollback_import.outcome }}" -eq "success") { "SUCCESS" } else { "FAILED" }
+
+          $summary = @"
+          ## Rollback Report
+
+          | Field | Value |
+          |-------|-------|
+          | **Solution** | ${{ inputs.solution_name }} |
+          | **Target Environment** | ${{ inputs.target_environment || 'production' }} |
+          | **Rolled Back From** | ${{ steps.current.outputs.CURRENT_VERSION }} |
+          | **Rolled Back To** | ${{ steps.validate.outputs.ROLLED_BACK_VERSION }} |
+          | **Backup Used** | ${{ inputs.backup_file }} |
+          | **Status** | $status |
+          | **Duration** | ${{ steps.rollback_import.outputs.DURATION }} |
+          | **Initiated By** | ${{ github.actor }} |
+          | **Timestamp** | $(Get-Date -Format 'yyyy-MM-dd HH:mm UTC') |
+          "@
+
+          $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+        shell: pwsh
