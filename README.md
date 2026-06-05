@@ -176,9 +176,6 @@ and auditable — single-file, no build step, fully driven from inside the app.
 
 - 🌐 [xpntl.dev](https://xpntl.dev)
 - 🏢 [CentrixIQ](https://centrixiq.com)
-<!-- Add your handles and uncomment:
-- 💼 [LinkedIn](https://www.linkedin.com/in/your-handle)
-- 🐦 [X / Twitter](https://x.com/your-handle)
--->
+- 💼 [LinkedIn](https://linkedin.com/in/holland-kevin)
 
 
